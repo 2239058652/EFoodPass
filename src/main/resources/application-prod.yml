@@ -1,0 +1,47 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: EFoodPass
+
+  # 数据源配置
+  datasource:
+    # 注意：这里改成了 mysql，对应 Docker 容器名！
+    url: jdbc:mysql://mysql:3306/e_food?useUnicode=true&characterEncoding=utf-8&serverTimezone=Asia/Shanghai
+    username: root
+    password: 123456 # 姐姐家数据库的密码，要和 docker-compose 里一致
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+    # 连接池配置
+    hikari:
+      minimum-idle: 5
+      maximum-pool-size: 20
+      connection-timeout: 30000
+      idle-timeout: 60000
+      max-lifetime: 1800000
+      connection-test-query: SELECT 1
+
+  # Redis 配置
+  data:
+    redis:
+      # 注意：这里改成了 redis，对应 Docker 容器名！
+      host: redis
+      port: 6379
+      database: 0
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 8
+          min-idle: 0
+          max-wait: -1ms
+      timeout: 5000ms
+
+# mybatis-plus 配置 (照抄 dev 的)
+mybatis-plus:
+  mapper-locations: classpath*:mapper/**/*.xml
+  type-aliases-package: com.epass.food.modules.*.entity
+  configuration:
+    map-underscore-to-camel-case: true
+    # 生产环境建议关闭 SQL 日志打印，提升性能
+    # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl

@@ -1,36 +1,3 @@
 spring:
-  application:
-    name: EFoodPass
-
-  # 数据源配置 使用mysql
-  datasource:
-    driver-class-name: com.mysql.cj.jdbc.Driver
-    url: jdbc:mysql://localhost:3306/e_food?useUnicode=true&characterEncoding=utf8mb4&useSSL=false&serverTimezone=Asia/Shanghai&allowPublicKeyRetrieval=true
-    username: root
-    password: Dingtong1998
-
-    # 连接池配置
-    hikari:
-      minimum-idle: 5
-      maximum-pool-size: 20
-      connection-timeout: 30000
-      idle-timeout: 60000
-      max-lifetime: 1800000
-      connection-test-query: SELECT 1
-
-  # Redis 配置
-  data:
-    redis:
-      host: localhost
-      port: 6379
-      database: 0
-      lettuce:
-        pool:
-          max-active: 8
-          max-idle: 8
-          min-idle: 0
-          max-wait: -1ms
-      timeout: 5000ms
-
-server:
-  port: 5603
+  profiles:
+    active: dev
