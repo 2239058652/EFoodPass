@@ -6,10 +6,15 @@ import com.epass.food.modules.auth.dto.CurrentUserResponse;
 import com.epass.food.modules.auth.dto.LoginRequest;
 import com.epass.food.modules.auth.dto.LoginResponse;
 import com.epass.food.modules.auth.service.AuthService;
+import com.epass.food.modules.system.role.entity.SysRole;
+import com.epass.food.modules.system.role.service.SysRoleService;
 import com.epass.food.modules.system.user.entity.SysUser;
 import com.epass.food.modules.system.user.service.SysUserService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 public class AuthServiceImpl implements AuthService {
@@ -17,13 +22,15 @@ public class AuthServiceImpl implements AuthService {
     private final SysUserService sysUserService;
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
+    private final SysRoleService sysRoleService;
 
-    public AuthServiceImpl(SysUserService sysUserService,
-                           PasswordEncoder passwordEncoder,
-                           JwtTokenProvider jwtTokenProvider) {
+    public AuthServiceImpl(SysUserService sysUserService, PasswordEncoder passwordEncoder,
+                           JwtTokenProvider jwtTokenProvider, SysRoleService sysRoleService) {
+
         this.sysUserService = sysUserService;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
+        this.sysRoleService = sysRoleService;
     }
 
     /**
@@ -63,15 +70,28 @@ public class AuthServiceImpl implements AuthService {
      */
     @Override
     public CurrentUserResponse getCurrentUser(Long userId) {
+
+        // 根据用户ID查询用户信息
         SysUser user = sysUserService.getById(userId);
         if (user == null) {
             throw new BusinessException(4004, "用户不存在");
         }
 
-        return new CurrentUserResponse(
-                user.getId(),
-                user.getUsername(),
-                user.getNickname()
-        );
+        // 根据用户ID查询用户角色列表
+        List<SysRole> roleList = sysRoleService.getRolesByUserId(userId);
+
+        // 把角色对象列表转换成角色编码列表
+        List<String> roleCodes = roleList.stream()
+                .map(SysRole::getRoleCode)
+                .collect(Collectors.toList());
+
+        // 封装当前用户信息 返回
+        CurrentUserResponse response = new CurrentUserResponse();
+        response.setUserId(user.getId());
+        response.setUsername(user.getUsername());
+        response.setNickname(user.getNickname());
+        response.setRoleCodes(roleCodes);
+
+        return response;
     }
 }
