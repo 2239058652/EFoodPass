@@ -174,3 +174,156 @@ CREATE TABLE sys_operation_log
 
 ALTER TABLE sys_user
     ADD COLUMN token_version INT NOT NULL DEFAULT 0 COMMENT '令牌版本号';
+
+
+# 初始化admin账号
+INSERT INTO sys_user (username,
+                      password_hash,
+                      nickname,
+                      phone,
+                      status,
+                      token_version)
+VALUES ('admin',
+        '$2a$10$ul9WaxC8WF.7P0vzj0og5uswfqT1foa7ZjPi1lh/F7LCaMTKszx92',
+        '系统管理员',
+        '13800000000',
+        1,
+        0)
+ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash),
+    nickname      = VALUES(nickname),
+                       phone         = VALUES(phone),
+                       status        = VALUES(status);
+
+# 在 sys_role 表里初始化一个管理员角色
+INSERT INTO sys_role (role_code,
+                      role_name,
+                      status)
+VALUES ('ADMIN',
+        '系统管理员',
+        1)
+ON DUPLICATE KEY UPDATE role_name = VALUES(role_name),
+    status    = VALUES(status);
+
+# 管理首页权限
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+VALUES (0,
+        'admin:dashboard',
+        '管理首页查看',
+        3,
+        '/admin/dashboard',
+        'GET',
+        1,
+        1)
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+    path      = VALUES(path),
+                       method    = VALUES(method),
+                       sort_no   = VALUES(sort_no),
+                       status    = VALUES(status);
+
+# 用户管理权限
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+VALUES (0, 'system:user:list', '用户列表查询', 3, '/system/user/list', 'GET', 10, 1),
+       (0, 'system:user:add', '新增用户', 3, '/system/user', 'POST', 11, 1),
+       (0, 'system:user:update', '修改用户', 3, '/system/user', 'PUT', 12, 1),
+       (0, 'system:user:delete', '删除用户', 3, '/system/user/{id}', 'DELETE', 13, 1),
+       (0, 'system:user:assign-role', '用户分配角色', 3, '/system/user/assign-role', 'POST', 14, 1)
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+    path      = VALUES(path),
+                       method    = VALUES(method),
+                       sort_no   = VALUES(sort_no),
+                       status    = VALUES(status);
+
+# 角色管理权限
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+VALUES (0, 'system:role:list', '角色列表查询', 3, '/system/role/list', 'GET', 20, 1),
+       (0, 'system:role:add', '新增角色', 3, '/system/role', 'POST', 21, 1),
+       (0, 'system:role:update', '修改角色', 3, '/system/role', 'PUT', 22, 1),
+       (0, 'system:role:delete', '删除角色', 3, '/system/role/{id}', 'DELETE', 23, 1),
+       (0, 'system:role:assign-permission', '角色分配权限', 3, '/system/role/assign-permission', 'POST', 24, 1)
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+    path      = VALUES(path),
+                       method    = VALUES(method),
+                       sort_no   = VALUES(sort_no),
+                       status    = VALUES(status);
+
+# 权限管理权限
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+VALUES (0, 'system:permission:list', '权限列表查询', 3, '/system/permission/list', 'GET', 30, 1),
+       (0, 'system:permission:add', '新增权限', 3, '/system/permission', 'POST', 31, 1),
+       (0, 'system:permission:update', '修改权限', 3, '/system/permission', 'PUT', 32, 1),
+       (0, 'system:permission:delete', '删除权限', 3, '/system/permission/{id}', 'DELETE', 33, 1)
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+    path      = VALUES(path),
+                       method    = VALUES(method),
+                       sort_no   = VALUES(sort_no),
+                       status    = VALUES(status);
+
+# 初始化用户角色关联 SQL
+INSERT INTO sys_user_role (user_id,
+                           role_id)
+SELECT u.id,
+       r.id
+FROM sys_user u
+         JOIN sys_role r ON r.role_code = 'ADMIN'
+WHERE u.username = 'admin'
+  AND NOT EXISTS (SELECT 1
+                  FROM sys_user_role ur
+                  WHERE ur.user_id = u.id
+                    AND ur.role_id = r.id);
+
+# 把 ADMIN 角色与权限全部关联起来
+INSERT INTO sys_role_permission (role_id,
+                                 permission_id)
+SELECT r.id,
+       p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.perm_code IN (
+                                                  'admin:dashboard',
+                                                  'system:user:list',
+                                                  'system:user:add',
+                                                  'system:user:update',
+                                                  'system:user:delete',
+                                                  'system:user:assign-role',
+                                                  'system:role:list',
+                                                  'system:role:add',
+                                                  'system:role:update',
+                                                  'system:role:delete',
+                                                  'system:role:assign-permission',
+                                                  'system:permission:list',
+                                                  'system:permission:add',
+                                                  'system:permission:update',
+                                                  'system:permission:delete'
+    )
+WHERE r.role_code = 'ADMIN'
+  AND NOT EXISTS (SELECT 1
+                  FROM sys_role_permission rp
+                  WHERE rp.role_id = r.id
+                    AND rp.permission_id = p.id);
