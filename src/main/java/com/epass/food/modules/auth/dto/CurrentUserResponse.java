@@ -15,4 +15,5 @@ public class CurrentUserResponse {
     private String username;
     private String nickname;
     private List<String> roleCodes;
+    private List<String> permissionCodes;
 }

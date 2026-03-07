@@ -1,5 +1,6 @@
 @baseUrl = http://localhost:5603
-@jwtToken =  eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyODg1MTY3LCJleHAiOjE3NzI4OTIzNjd9.SMW9xWQfO9QH5benIdQcBdrxAFy_ciezIq-RUNjObSH8PkXY8sGpn7qoQrvRm8x6GzzL9Z-LcJT5DCVeMdTfXw
+@jwtToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyODg1MTY3LCJleHAiOjE3NzI4OTIzNjd9.SMW9xWQfO9QH5benIdQcBdrxAFy_ciezIq-RUNjObSH8PkXY8sGpn7qoQrvRm8x6GzzL9Z-LcJT5DCVeMdTfXw
+@userToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ1c2VyMSIsInRva2VuVmVyc2lvbiI6MCwiaWF0IjoxNzcyODg1NzA0LCJleHAiOjE3NzI4OTI5MDR9.CSvxyqoxSY5geXdTxzogs_gRLmMdVrLTWCrbjNfgKd8x0RGJu7EaF7RPsmPlFif0ChTxOAmBrxCojOWOu7LwxQ
 # 测试账号密码
 # 管理员： admin Admin@123
 # 普通用户： user1 User1@123
@@ -9,14 +10,14 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "username": "admin",
-  "password": "Admin@123"
+  "username": "user1",
+  "password": "User1@123"
 }
 
 ### 获取用户信息
 GET {{baseUrl}}/auth/me
 Content-Type: application/json
-Authorization: Bearer {{jwtToken}}
+Authorization: Bearer {{userToken}}
 
 ### 获取仪表盘数据
 GET {{baseUrl}}/admin/dashboard

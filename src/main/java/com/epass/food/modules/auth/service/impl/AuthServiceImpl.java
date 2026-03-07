@@ -6,6 +6,7 @@ import com.epass.food.modules.auth.dto.CurrentUserResponse;
 import com.epass.food.modules.auth.dto.LoginRequest;
 import com.epass.food.modules.auth.dto.LoginResponse;
 import com.epass.food.modules.auth.service.AuthService;
+import com.epass.food.modules.system.permission.service.SysPermissionService;
 import com.epass.food.modules.system.role.entity.SysRole;
 import com.epass.food.modules.system.role.service.SysRoleService;
 import com.epass.food.modules.system.user.entity.SysUser;
@@ -23,14 +24,17 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final JwtTokenProvider jwtTokenProvider;
     private final SysRoleService sysRoleService;
+    private final SysPermissionService sysPermissionService;
 
     public AuthServiceImpl(SysUserService sysUserService, PasswordEncoder passwordEncoder,
-                           JwtTokenProvider jwtTokenProvider, SysRoleService sysRoleService) {
+                           JwtTokenProvider jwtTokenProvider, SysRoleService sysRoleService,
+                           SysPermissionService sysPermissionService) {
 
         this.sysUserService = sysUserService;
         this.passwordEncoder = passwordEncoder;
         this.jwtTokenProvider = jwtTokenProvider;
         this.sysRoleService = sysRoleService;
+        this.sysPermissionService = sysPermissionService;
     }
 
     /**
@@ -80,6 +84,9 @@ public class AuthServiceImpl implements AuthService {
         // 根据用户ID查询用户角色列表
         List<SysRole> roleList = sysRoleService.getRolesByUserId(userId);
 
+        // 根据用户ID查询用户权限列表
+        List<String> permissionCodes = sysPermissionService.getPermissionCodesByUserId(userId);
+
         // 把角色对象列表转换成角色编码列表
         List<String> roleCodes = roleList.stream()
                 .map(SysRole::getRoleCode)
@@ -91,6 +98,7 @@ public class AuthServiceImpl implements AuthService {
         response.setUsername(user.getUsername());
         response.setNickname(user.getNickname());
         response.setRoleCodes(roleCodes);
+        response.setPermissionCodes(permissionCodes);
 
         return response;
     }
