@@ -1,15 +1,20 @@
-@jwtToken =  eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyODc3MDUzLCJleHAiOjE3NzI4ODQyNTN9.Y7-C5KhJRtpgqSl5P9OyU3lByCMAVCDZf-WyBpgYE-1YTU3bL0DA14evhbxUScDvI2V14AQMt2WBT7UXBc_gYw
+@baseUrl = http://localhost:5603
+@jwtToken =  eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ1c2VyMSIsInRva2VuVmVyc2lvbiI6MCwiaWF0IjoxNzcyODgzMDQyLCJleHAiOjE3NzI4OTAyNDJ9.06OT1oWDieNtDD6iSQYZNSQhB-W3WdqdQtproOPi-76bjrL4J49pCtkK4qKS0TNHbxlR2u1A9t1Rhy7E4Jnb7A
 
 ### 登录
-POST http://localhost:5603/auth/login
+POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "username": "admin",
-  "password": "Admin@123"
+  "username": "user1",
+  "password": "User1@123"
 }
 
 ### 获取用户信息
-GET http://localhost:5603/auth/me
+GET {{baseUrl}}/auth/me
 Content-Type: application/json
+Authorization: Bearer {{jwtToken}}
+
+### 获取仪表盘数据
+GET {{baseUrl}}/admin/dashboard
 Authorization: Bearer {{jwtToken}}

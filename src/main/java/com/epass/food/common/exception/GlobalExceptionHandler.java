@@ -2,6 +2,7 @@ package com.epass.food.common.exception;
 
 import com.epass.food.common.result.Result;
 import com.epass.food.common.result.ResultCode;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 
@@ -16,6 +17,11 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(BusinessException.class)
     public Result<Void> handleBusinessException(BusinessException e) {
         return new Result<>(e.getCode(), e.getMessage(), null);
+    }
+
+    @ExceptionHandler(AccessDeniedException.class)
+    public Result<Void> handleAccessDeniedException(AccessDeniedException e) {
+        return new Result<>(403, "无权限访问", null);
     }
 
     @ExceptionHandler(Exception.class)

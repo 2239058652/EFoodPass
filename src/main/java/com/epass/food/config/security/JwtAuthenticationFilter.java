@@ -1,5 +1,7 @@
 package com.epass.food.config.security;
 
+import com.epass.food.modules.system.role.entity.SysRole;
+import com.epass.food.modules.system.role.service.SysRoleService;
 import com.epass.food.modules.system.user.entity.SysUser;
 import com.epass.food.modules.system.user.service.SysUserService;
 import io.jsonwebtoken.Claims;
@@ -8,13 +10,15 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
-import java.util.Collections;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * JWT 认证过滤器 （每次请求先经过过滤器链，这个jwt过滤器是其中一环）
@@ -25,10 +29,13 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtTokenProvider jwtTokenProvider;
     private final SysUserService sysUserService;
+    private final SysRoleService sysRoleService;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, SysUserService sysUserService) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, SysUserService sysUserService,
+                                   SysRoleService sysRoleService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.sysUserService = sysUserService;
+        this.sysRoleService = sysRoleService;
     }
 
     /**
@@ -48,14 +55,22 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Integer tokenVersion = claims.get("tokenVersion", Integer.class);
 
                 SysUser user = sysUserService.getById(userId);
-                if (user != null
-                        && Integer.valueOf(1).equals(user.getStatus())
+                if (user != null && Integer.valueOf(1).equals(user.getStatus())
                         && user.getTokenVersion().equals(tokenVersion)) {
+
+                    // 先准备一个空列表，用来装“Security 能识别的角色标签
+                    List<SysRole> roleList = sysRoleService.getRolesByUserId(userId);
+
+                    // 遍历角色列表，将角色标签装入 authorities 列表
+                    List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                    for (SysRole role : roleList) {
+                        authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getRoleCode()));
+                    }
 
                     LoginUser loginUser = new LoginUser(user.getId(), user.getUsername(), user.getNickname());
 
                     UsernamePasswordAuthenticationToken authentication =
-                            new UsernamePasswordAuthenticationToken(loginUser, null, Collections.emptyList());
+                            new UsernamePasswordAuthenticationToken(loginUser, null, authorities);
 
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }

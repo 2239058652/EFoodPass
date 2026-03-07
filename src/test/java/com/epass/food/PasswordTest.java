@@ -14,7 +14,7 @@ class PasswordTest {
     @Test
     void testPasswordHash() {
         BCryptPasswordEncoder encoder = new BCryptPasswordEncoder();
-        String encode = encoder.encode("Admin@123");
+        String encode = encoder.encode("User1@123");
         System.out.println("哈希结果: " + encode);
     }
 }
