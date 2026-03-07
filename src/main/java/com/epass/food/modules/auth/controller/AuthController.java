@@ -2,6 +2,7 @@ package com.epass.food.modules.auth.controller;
 
 import com.epass.food.common.result.Result;
 import com.epass.food.config.security.LoginUser;
+import com.epass.food.modules.auth.dto.CurrentUserResponse;
 import com.epass.food.modules.auth.dto.LoginRequest;
 import com.epass.food.modules.auth.dto.LoginResponse;
 import com.epass.food.modules.auth.service.AuthService;
@@ -31,13 +32,13 @@ public class AuthController {
         return Result.success(response);
     }
 
+    /**
+     * 获取当前用户信息
+     */
     @GetMapping("/me")
-    public Result<LoginResponse> me(Authentication authentication) {
+    public Result<CurrentUserResponse> me(Authentication authentication) {
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
-        LoginResponse response = new LoginResponse();
-        response.setId(loginUser.getUserId());
-        response.setUsername(loginUser.getUsername());
-        response.setNickname(loginUser.getNickname());
+        CurrentUserResponse response = authService.getCurrentUser(loginUser.getUserId());
         return Result.success(response);
     }
 }
