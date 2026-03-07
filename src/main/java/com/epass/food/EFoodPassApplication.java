@@ -13,7 +13,7 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
  * - @ComponentScan: 自动扫描组件
  */
 @SpringBootApplication
-@MapperScan("com.epass.food.modules.*.mapper") // 使用通配符 * 匹配中间的模块名，精确锁定到 mapper 包
+@MapperScan("com.epass.food.modules.**.mapper") // 使用通配符 * 匹配中间的模块名，精确锁定到 mapper 包
 public class EFoodPassApplication {
 
     public static void main(String[] args) {
