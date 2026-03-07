@@ -15,4 +15,10 @@ public class AdminTestController {
     public Result<String> dashboard() {
         return Result.success("admin dashboard");
     }
+
+    @PreAuthorize("hasAuthority('admin:dashboard')")
+    @GetMapping("/dashboard2")
+    public Result<String> dashboard2() {
+        return Result.success("admin dashboard by authority");
+    }
 }

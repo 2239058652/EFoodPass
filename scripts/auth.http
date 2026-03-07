@@ -1,13 +1,16 @@
 @baseUrl = http://localhost:5603
-@jwtToken =  eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ1c2VyMSIsInRva2VuVmVyc2lvbiI6MCwiaWF0IjoxNzcyODgzMDQyLCJleHAiOjE3NzI4OTAyNDJ9.06OT1oWDieNtDD6iSQYZNSQhB-W3WdqdQtproOPi-76bjrL4J49pCtkK4qKS0TNHbxlR2u1A9t1Rhy7E4Jnb7A
+@jwtToken =  eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyODg1MTY3LCJleHAiOjE3NzI4OTIzNjd9.SMW9xWQfO9QH5benIdQcBdrxAFy_ciezIq-RUNjObSH8PkXY8sGpn7qoQrvRm8x6GzzL9Z-LcJT5DCVeMdTfXw
+# 测试账号密码
+# 管理员： admin Admin@123
+# 普通用户： user1 User1@123
 
 ### 登录
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "username": "user1",
-  "password": "User1@123"
+  "username": "admin",
+  "password": "Admin@123"
 }
 
 ### 获取用户信息
@@ -17,4 +20,12 @@ Authorization: Bearer {{jwtToken}}
 
 ### 获取仪表盘数据
 GET {{baseUrl}}/admin/dashboard
+Authorization: Bearer {{jwtToken}}
+
+### 获取权限列表
+GET {{baseUrl}}/admin/dashboard2
+Authorization: Bearer {{jwtToken}}
+
+### 获取用户列表
+GET {{baseUrl}}/test/permissions
 Authorization: Bearer {{jwtToken}}

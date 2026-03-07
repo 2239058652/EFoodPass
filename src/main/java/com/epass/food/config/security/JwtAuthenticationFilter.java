@@ -1,5 +1,6 @@
 package com.epass.food.config.security;
 
+import com.epass.food.modules.system.permission.service.SysPermissionService;
 import com.epass.food.modules.system.role.entity.SysRole;
 import com.epass.food.modules.system.role.service.SysRoleService;
 import com.epass.food.modules.system.user.entity.SysUser;
@@ -30,12 +31,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final JwtTokenProvider jwtTokenProvider;
     private final SysUserService sysUserService;
     private final SysRoleService sysRoleService;
+    private final SysPermissionService sysPermissionService;
 
-    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider, SysUserService sysUserService,
-                                   SysRoleService sysRoleService) {
+    public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
+                                   SysUserService sysUserService,
+                                   SysRoleService sysRoleService,
+                                   SysPermissionService sysPermissionService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.sysUserService = sysUserService;
         this.sysRoleService = sysRoleService;
+        this.sysPermissionService = sysPermissionService;
     }
 
     /**
@@ -65,6 +70,11 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     List<SimpleGrantedAuthority> authorities = new ArrayList<>();
                     for (SysRole role : roleList) {
                         authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getRoleCode()));
+                    }
+
+                    List<String> permissionCodes = sysPermissionService.getPermissionCodesByUserId(userId);
+                    for (String permissionCode : permissionCodes) {
+                        authorities.add(new SimpleGrantedAuthority(permissionCode));
                     }
 
                     LoginUser loginUser = new LoginUser(user.getId(), user.getUsername(), user.getNickname());
