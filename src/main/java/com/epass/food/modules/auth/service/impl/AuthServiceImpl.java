@@ -1,21 +1,28 @@
 package com.epass.food.modules.auth.service.impl;
 
 import com.epass.food.common.exception.BusinessException;
+import com.epass.food.config.security.JwtTokenProvider;
 import com.epass.food.modules.auth.dto.LoginRequest;
 import com.epass.food.modules.auth.dto.LoginResponse;
 import com.epass.food.modules.auth.service.AuthService;
 import com.epass.food.modules.system.user.entity.SysUser;
 import com.epass.food.modules.system.user.service.SysUserService;
-import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 @Service
 public class AuthServiceImpl implements AuthService {
 
     private final SysUserService sysUserService;
+    private final PasswordEncoder passwordEncoder;
+    private final JwtTokenProvider jwtTokenProvider;
 
-    public AuthServiceImpl(SysUserService sysUserService) {
+    public AuthServiceImpl(SysUserService sysUserService,
+                           PasswordEncoder passwordEncoder,
+                           JwtTokenProvider jwtTokenProvider) {
         this.sysUserService = sysUserService;
+        this.passwordEncoder = passwordEncoder;
+        this.jwtTokenProvider = jwtTokenProvider;
     }
 
     /**
@@ -36,12 +43,14 @@ public class AuthServiceImpl implements AuthService {
             throw new BusinessException(4002, "用户已被禁用");
         }
 
-        BCryptPasswordEncoder passwordEncoder = new BCryptPasswordEncoder();
         boolean matched = passwordEncoder.matches(request.getPassword(), user.getPasswordHash());
         if (!matched) {
             throw new BusinessException(4001, "用户名或密码错误");
         }
-        return new LoginResponse(user.getId(), user.getUsername(), user.getNickname());
+
+        // 生成 JWT token 返回登录响应结果带上 token
+        String token = jwtTokenProvider.createToken(user.getId(), user.getUsername());
+        return new LoginResponse(user.getId(), user.getUsername(), user.getNickname(), token);
 
     }
 }

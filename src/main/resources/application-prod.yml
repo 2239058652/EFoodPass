@@ -45,3 +45,8 @@ mybatis-plus:
     map-underscore-to-camel-case: true
     # 生产环境建议关闭 SQL 日志打印，提升性能
     # log-impl: org.apache.ibatis.logging.stdout.StdOutImpl
+
+auth:
+  jwt:
+    secret: dc0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
+    expire-seconds: 7200
