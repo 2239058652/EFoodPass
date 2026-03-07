@@ -14,5 +14,8 @@ public class SysPermission {
 
     private String permCode;
     private String permName;
+    private Integer permType;
+    private String path;
+    private String method;
     private Integer status;
 }

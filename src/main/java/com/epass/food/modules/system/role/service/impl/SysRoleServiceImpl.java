@@ -2,13 +2,24 @@ package com.epass.food.modules.system.role.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
+import com.epass.food.common.exception.BusinessException;
+import com.epass.food.modules.system.permission.entity.SysPermission;
+import com.epass.food.modules.system.permission.entity.SysRolePermission;
+import com.epass.food.modules.system.permission.mapper.SysPermissionMapper;
+import com.epass.food.modules.system.permission.mapper.SysRolePermissionMapper;
+import com.epass.food.modules.system.role.dto.RoleAssignPermissionRequest;
+import com.epass.food.modules.system.role.dto.RoleCreateRequest;
+import com.epass.food.modules.system.role.dto.RoleListQuery;
+import com.epass.food.modules.system.role.dto.RoleListResponse;
 import com.epass.food.modules.system.role.entity.SysRole;
 import com.epass.food.modules.system.role.entity.SysUserRole;
 import com.epass.food.modules.system.role.mapper.SysRoleMapper;
 import com.epass.food.modules.system.role.mapper.SysUserRoleMapper;
 import com.epass.food.modules.system.role.service.SysRoleService;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -17,9 +28,15 @@ import java.util.stream.Collectors;
 public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> implements SysRoleService {
 
     private final SysUserRoleMapper sysUserRoleMapper;
+    private final SysRolePermissionMapper sysRolePermissionMapper;
+    private final SysPermissionMapper sysPermissionMapper;
 
-    public SysRoleServiceImpl(SysUserRoleMapper sysUserRoleMapper) {
+    public SysRoleServiceImpl(SysUserRoleMapper sysUserRoleMapper,
+                              SysRolePermissionMapper sysRolePermissionMapper,
+                              SysPermissionMapper sysPermissionMapper) {
         this.sysUserRoleMapper = sysUserRoleMapper;
+        this.sysRolePermissionMapper = sysRolePermissionMapper;
+        this.sysPermissionMapper = sysPermissionMapper;
     }
 
     /**
@@ -48,5 +65,97 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
                 .eq(SysRole::getStatus, 1);
 
         return this.list(roleQuery);
+    }
+
+    /**
+     * 查询角色列表
+     *
+     * @param query 查询条件
+     * @return 角色列表
+     */
+    @Override
+    public List<RoleListResponse> listRoles(RoleListQuery query) {
+        LambdaQueryWrapper<SysRole> queryWrapper = new LambdaQueryWrapper<>();
+
+        if (query != null && StringUtils.hasText(query.getRoleCode())) {
+            queryWrapper.like(SysRole::getRoleCode, query.getRoleCode());
+        }
+
+        if (query != null && query.getStatus() != null) {
+            queryWrapper.eq(SysRole::getStatus, query.getStatus());
+        }
+
+        queryWrapper.orderByDesc(SysRole::getId);
+
+        List<SysRole> roleList = this.list(queryWrapper);
+
+        List<RoleListResponse> responseList = new ArrayList<>();
+        for (SysRole role : roleList) {
+            RoleListResponse response = new RoleListResponse();
+            response.setId(role.getId());
+            response.setRoleCode(role.getRoleCode());
+            response.setRoleName(role.getRoleName());
+            response.setStatus(role.getStatus());
+            responseList.add(response);
+        }
+
+        return responseList;
+    }
+
+    /**
+     * 新增角色
+     *
+     * @param request 新增角色请求参数
+     */
+    @Override
+    public void createRole(RoleCreateRequest request) {
+        Long count = this.count(
+                new LambdaQueryWrapper<SysRole>()
+                        .eq(SysRole::getRoleCode, request.getRoleCode())
+        );
+        if (count != null && count > 0) {
+            throw new BusinessException(4006, "角色编码已存在");
+        }
+
+        SysRole role = new SysRole();
+        role.setRoleCode(request.getRoleCode());
+        role.setRoleName(request.getRoleName());
+        role.setStatus(request.getStatus());
+
+        this.save(role);
+    }
+
+    /**
+     * 分配权限
+     *
+     * @param request 分配权限请求参数
+     */
+    @Override
+    public void assignPermissions(RoleAssignPermissionRequest request) {
+        SysRole role = this.getById(request.getRoleId());
+        if (role == null) {
+            throw new BusinessException(4007, "角色不存在");
+        }
+
+        Long permissionCount = sysPermissionMapper.selectCount(
+                new LambdaQueryWrapper<SysPermission>()
+                        .in(SysPermission::getId, request.getPermissionIds())
+                        .eq(SysPermission::getStatus, 1)
+        );
+        if (permissionCount == null || permissionCount != request.getPermissionIds().size()) {
+            throw new BusinessException(4008, "权限不存在或已禁用");
+        }
+
+        sysRolePermissionMapper.delete(
+                new LambdaQueryWrapper<SysRolePermission>()
+                        .eq(SysRolePermission::getRoleId, request.getRoleId())
+        );
+
+        for (Long permissionId : request.getPermissionIds()) {
+            SysRolePermission rolePermission = new SysRolePermission();
+            rolePermission.setRoleId(request.getRoleId());
+            rolePermission.setPermissionId(permissionId);
+            sysRolePermissionMapper.insert(rolePermission);
+        }
     }
 }

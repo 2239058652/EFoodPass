@@ -1,17 +1,18 @@
 @baseUrl = http://localhost:5603
-@jwtToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyODg1MTY3LCJleHAiOjE3NzI4OTIzNjd9.SMW9xWQfO9QH5benIdQcBdrxAFy_ciezIq-RUNjObSH8PkXY8sGpn7qoQrvRm8x6GzzL9Z-LcJT5DCVeMdTfXw
+@adminToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyODkzNDAzLCJleHAiOjE3NzI5MDA2MDN9.YhXPGNNej1H2CRRlb8OXkCQYcUaSE_lVRgMchtZzoi3krkqra1LOX9XArcO0yWepTwQyNOu4P3b6JJ6510hNjw
 @userToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ1c2VyMSIsInRva2VuVmVyc2lvbiI6MCwiaWF0IjoxNzcyODg1NzA0LCJleHAiOjE3NzI4OTI5MDR9.CSvxyqoxSY5geXdTxzogs_gRLmMdVrLTWCrbjNfgKd8x0RGJu7EaF7RPsmPlFif0ChTxOAmBrxCojOWOu7LwxQ
 # 测试账号密码
 # 管理员： admin Admin@123
 # 普通用户： user1 User1@123
+# 测试用户 user2 User@123
 
 ### 登录
 POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "username": "user1",
-  "password": "User1@123"
+  "username": "admin",
+  "password": "Admin@123"
 }
 
 ### 获取用户信息
@@ -21,12 +22,87 @@ Authorization: Bearer {{userToken}}
 
 ### 获取仪表盘数据
 GET {{baseUrl}}/admin/dashboard
-Authorization: Bearer {{jwtToken}}
+Authorization: Bearer {{adminToken}}
 
 ### 获取权限列表
 GET {{baseUrl}}/admin/dashboard2
-Authorization: Bearer {{jwtToken}}
+Authorization: Bearer {{adminToken}}
 
-### 获取用户列表
+### 获取用户列表-测试
 GET {{baseUrl}}/test/permissions
-Authorization: Bearer {{jwtToken}}
+Authorization: Bearer {{adminToken}}
+
+### 获取用户列表 + 角色聚合
+GET {{baseUrl}}/system/user/list?username=admin
+Authorization: Bearer {{adminToken}}
+
+### 新增用户接口
+POST {{baseUrl}}/system/user
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "username": "user2",
+  "password": "User@123",
+  "nickname": "测试用户",
+  "phone": "13700000000",
+  "status": 1
+}
+
+### 分配角色
+POST {{baseUrl}}/system/user/assign-role
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "userId": 4,
+  "roleIds": [
+    2
+  ]
+}
+
+### 查询角色列表
+GET {{baseUrl}}/system/role/list
+Authorization: Bearer {{userToken}}
+
+### 新增角色接口
+POST {{baseUrl}}/system/role
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "roleCode": "MANAGER",
+  "roleName": "店长",
+  "status": 1
+}
+
+### 角色分配权限
+POST {{baseUrl}}/system/role/assign-permission
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "roleId": 3,
+  "permissionIds": [
+    1,
+    2
+  ]
+}
+
+### 权限管理列表接口
+GET {{baseUrl}}/system/permission/list
+Authorization: Bearer {{adminToken}}
+
+### 新增权限接口
+POST {{baseUrl}}/system/permission
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "permCode": "food:category:list",
+  "permName": "菜品分类列表查询",
+  "permType": 3,
+  "path": "/food-category/list",
+  "method": "GET",
+  "status": 1
+}

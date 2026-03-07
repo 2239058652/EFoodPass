@@ -1,6 +1,10 @@
 package com.epass.food.modules.system.permission.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.epass.food.common.exception.BusinessException;
+import com.epass.food.modules.system.permission.dto.PermissionCreateRequest;
+import com.epass.food.modules.system.permission.dto.PermissionListQuery;
+import com.epass.food.modules.system.permission.dto.PermissionListResponse;
 import com.epass.food.modules.system.permission.entity.SysPermission;
 import com.epass.food.modules.system.permission.entity.SysRolePermission;
 import com.epass.food.modules.system.permission.mapper.SysPermissionMapper;
@@ -9,6 +13,7 @@ import com.epass.food.modules.system.permission.service.SysPermissionService;
 import com.epass.food.modules.system.role.entity.SysRole;
 import com.epass.food.modules.system.role.service.SysRoleService;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -87,5 +92,63 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         }
 
         return permissionCodes;
+    }
+
+    @Override
+    public List<PermissionListResponse> listPermissions(PermissionListQuery query) {
+        LambdaQueryWrapper<SysPermission> queryWrapper = new LambdaQueryWrapper<>();
+
+        if (query != null && StringUtils.hasText(query.getPermCode())) {
+            queryWrapper.like(SysPermission::getPermCode, query.getPermCode());
+        }
+
+        if (query != null && query.getStatus() != null) {
+            queryWrapper.eq(SysPermission::getStatus, query.getStatus());
+        }
+
+        queryWrapper.orderByDesc(SysPermission::getId);
+
+        List<SysPermission> permissionList = sysPermissionMapper.selectList(queryWrapper);
+
+        List<PermissionListResponse> responseList = new ArrayList<>();
+        for (SysPermission permission : permissionList) {
+            PermissionListResponse response = new PermissionListResponse();
+            response.setId(permission.getId());
+            response.setPermCode(permission.getPermCode());
+            response.setPermName(permission.getPermName());
+            response.setPermType(permission.getPermType());
+            response.setPath(permission.getPath());
+            response.setMethod(permission.getMethod());
+            response.setStatus(permission.getStatus());
+            responseList.add(response);
+        }
+
+        return responseList;
+    }
+
+    /**
+     * 新增权限
+     *
+     * @param request 新增权限请求参数
+     */
+    @Override
+    public void createPermission(PermissionCreateRequest request) {
+        Long count = sysPermissionMapper.selectCount(
+                new LambdaQueryWrapper<SysPermission>()
+                        .eq(SysPermission::getPermCode, request.getPermCode())
+        );
+        if (count != null && count > 0) {
+            throw new BusinessException(4009, "权限编码已存在");
+        }
+
+        SysPermission permission = new SysPermission();
+        permission.setPermCode(request.getPermCode());
+        permission.setPermName(request.getPermName());
+        permission.setPermType(request.getPermType());
+        permission.setPath(request.getPath());
+        permission.setMethod(request.getMethod());
+        permission.setStatus(request.getStatus());
+
+        sysPermissionMapper.insert(permission);
     }
 }
