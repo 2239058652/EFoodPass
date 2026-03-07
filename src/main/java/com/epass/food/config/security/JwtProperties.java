@@ -5,6 +5,8 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
  * JWT 配置类 读取配置文件 auth.jwt 相关的属性
+ *
+ * @ConfigurationProperties(prefix = "auth.jwt") 读取配置文件 auth.jwt 相关的属性
  */
 @Data
 @ConfigurationProperties(prefix = "auth.jwt")

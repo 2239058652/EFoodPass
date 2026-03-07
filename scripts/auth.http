@@ -1,0 +1,15 @@
+@jwtToken =  eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsImlhdCI6MTc3Mjg3Mzc3NSwiZXhwIjoxNzcyODgwOTc1fQ.xOR-9n05ZksCqoRBGaoK6FXPeeswY6-DMHQW9I8Y243RrNXObQTCraLXbSD8iBtYPkgst3ge7oMpEQjnCAvPKw
+
+### 登录
+POST http://localhost:5603/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "Admin@123"
+}
+
+### 获取用户信息
+GET http://localhost:5603/auth/me
+Content-Type: application/json
+Authorization: Bearer {{jwtToken}}
