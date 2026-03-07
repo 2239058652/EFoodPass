@@ -4,6 +4,7 @@ import com.epass.food.common.result.Result;
 import com.epass.food.modules.system.permission.dto.PermissionCreateRequest;
 import com.epass.food.modules.system.permission.dto.PermissionListQuery;
 import com.epass.food.modules.system.permission.dto.PermissionListResponse;
+import com.epass.food.modules.system.permission.dto.PermissionUpdateStatusRequest;
 import com.epass.food.modules.system.permission.service.SysPermissionService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -38,12 +39,23 @@ public class SysPermissionController {
      * 新增权限
      *
      * @param request 新增权限请求参数
-     * @return 无
      */
     @PreAuthorize("hasAuthority('system:permission:add')")
     @PostMapping
     public Result<Void> create(@Valid @RequestBody PermissionCreateRequest request) {
         sysPermissionService.createPermission(request);
+        return Result.success();
+    }
+
+    /**
+     * 更新权限状态
+     *
+     * @param request 更新权限状态请求参数
+     */
+    @PreAuthorize("hasAuthority('system:permission:update')")
+    @PutMapping("/status")
+    public Result<Void> updateStatus(@Valid @RequestBody PermissionUpdateStatusRequest request) {
+        sysPermissionService.updatePermissionStatus(request);
         return Result.success();
     }
 }

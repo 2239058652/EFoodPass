@@ -8,10 +8,7 @@ import com.epass.food.modules.system.role.entity.SysUserRole;
 import com.epass.food.modules.system.role.mapper.SysRoleMapper;
 import com.epass.food.modules.system.role.mapper.SysUserRoleMapper;
 import com.epass.food.modules.system.role.service.SysRoleService;
-import com.epass.food.modules.system.user.dto.UserAssignRoleRequest;
-import com.epass.food.modules.system.user.dto.UserCreateRequest;
-import com.epass.food.modules.system.user.dto.UserListQuery;
-import com.epass.food.modules.system.user.dto.UserListResponse;
+import com.epass.food.modules.system.user.dto.*;
 import com.epass.food.modules.system.user.entity.SysUser;
 import com.epass.food.modules.system.user.mapper.SysUserMapper;
 import com.epass.food.modules.system.user.service.SysUserService;
@@ -164,5 +161,29 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             userRole.setRoleId(roleId);
             sysUserRoleMapper.insert(userRole);
         }
+    }
+
+    /**
+     * 更新用户状态
+     *
+     * @param request 更新用户状态的请求参数
+     */
+    @Override
+    public void updateUserStatus(UserUpdateStatusRequest request) {
+        SysUser user = this.getById(request.getUserId());
+        if (user == null) {
+            throw new BusinessException(4004, "用户不存在");
+        }
+
+        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
+            throw new BusinessException(4010, "用户状态值不合法");
+        }
+
+        if ("admin".equals(user.getUsername()) && Integer.valueOf(0).equals(request.getStatus())) {
+            throw new BusinessException(4011, "系统管理员不能被禁用");
+        }
+
+        user.setStatus(request.getStatus());
+        this.updateById(user);
     }
 }

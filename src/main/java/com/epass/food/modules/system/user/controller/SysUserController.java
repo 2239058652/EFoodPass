@@ -1,10 +1,7 @@
 package com.epass.food.modules.system.user.controller;
 
 import com.epass.food.common.result.Result;
-import com.epass.food.modules.system.user.dto.UserAssignRoleRequest;
-import com.epass.food.modules.system.user.dto.UserCreateRequest;
-import com.epass.food.modules.system.user.dto.UserListQuery;
-import com.epass.food.modules.system.user.dto.UserListResponse;
+import com.epass.food.modules.system.user.dto.*;
 import com.epass.food.modules.system.user.service.SysUserService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -58,6 +55,19 @@ public class SysUserController {
     @PostMapping("/assign-role")
     public Result<Void> assignRole(@Valid @RequestBody UserAssignRoleRequest request) {
         sysUserService.assignRoles(request);
+        return Result.success();
+    }
+
+    /**
+     * 更新用户状态
+     *
+     * @param request 更新用户状态请求参数
+     * @return 无
+     */
+    @PreAuthorize("hasAuthority('system:user:update')")
+    @PutMapping("/status")
+    public Result<Void> updateStatus(@Valid @RequestBody UserUpdateStatusRequest request) {
+        sysUserService.updateUserStatus(request);
         return Result.success();
     }
 }

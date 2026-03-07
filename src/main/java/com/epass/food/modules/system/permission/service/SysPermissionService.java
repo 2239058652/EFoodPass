@@ -3,6 +3,7 @@ package com.epass.food.modules.system.permission.service;
 import com.epass.food.modules.system.permission.dto.PermissionCreateRequest;
 import com.epass.food.modules.system.permission.dto.PermissionListQuery;
 import com.epass.food.modules.system.permission.dto.PermissionListResponse;
+import com.epass.food.modules.system.permission.dto.PermissionUpdateStatusRequest;
 
 import java.util.List;
 
@@ -30,4 +31,11 @@ public interface SysPermissionService {
      * @param request 新增权限请求参数
      */
     void createPermission(PermissionCreateRequest request);
+
+    /**
+     * 修改权限状态
+     *
+     * @param request 修改权限状态请求参数
+     */
+    void updatePermissionStatus(PermissionUpdateStatusRequest request);
 }

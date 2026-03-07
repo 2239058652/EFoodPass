@@ -7,10 +7,7 @@ import com.epass.food.modules.system.permission.entity.SysPermission;
 import com.epass.food.modules.system.permission.entity.SysRolePermission;
 import com.epass.food.modules.system.permission.mapper.SysPermissionMapper;
 import com.epass.food.modules.system.permission.mapper.SysRolePermissionMapper;
-import com.epass.food.modules.system.role.dto.RoleAssignPermissionRequest;
-import com.epass.food.modules.system.role.dto.RoleCreateRequest;
-import com.epass.food.modules.system.role.dto.RoleListQuery;
-import com.epass.food.modules.system.role.dto.RoleListResponse;
+import com.epass.food.modules.system.role.dto.*;
 import com.epass.food.modules.system.role.entity.SysRole;
 import com.epass.food.modules.system.role.entity.SysUserRole;
 import com.epass.food.modules.system.role.mapper.SysRoleMapper;
@@ -157,5 +154,29 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             rolePermission.setPermissionId(permissionId);
             sysRolePermissionMapper.insert(rolePermission);
         }
+    }
+
+    /**
+     * 更新角色状态
+     *
+     * @param request 更新角色状态请求参数
+     */
+    @Override
+    public void updateRoleStatus(RoleUpdateStatusRequest request) {
+        SysRole role = this.getById(request.getRoleId());
+        if (role == null) {
+            throw new BusinessException(4007, "角色不存在");
+        }
+
+        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
+            throw new BusinessException(4012, "角色状态值不合法");
+        }
+
+        if ("ADMIN".equals(role.getRoleCode()) && Integer.valueOf(0).equals(request.getStatus())) {
+            throw new BusinessException(4013, "系统管理员角色不能被禁用");
+        }
+
+        role.setStatus(request.getStatus());
+        this.updateById(role);
     }
 }

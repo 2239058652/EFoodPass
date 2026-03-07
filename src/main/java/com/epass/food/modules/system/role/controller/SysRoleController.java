@@ -1,10 +1,7 @@
 package com.epass.food.modules.system.role.controller;
 
 import com.epass.food.common.result.Result;
-import com.epass.food.modules.system.role.dto.RoleAssignPermissionRequest;
-import com.epass.food.modules.system.role.dto.RoleCreateRequest;
-import com.epass.food.modules.system.role.dto.RoleListQuery;
-import com.epass.food.modules.system.role.dto.RoleListResponse;
+import com.epass.food.modules.system.role.dto.*;
 import com.epass.food.modules.system.role.service.SysRoleService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -58,6 +55,19 @@ public class SysRoleController {
     @PostMapping("/assign-permission")
     public Result<Void> assignPermission(@Valid @RequestBody RoleAssignPermissionRequest request) {
         sysRoleService.assignPermissions(request);
+        return Result.success();
+    }
+
+    /**
+     * 更新角色状态
+     *
+     * @param request 更新角色状态请求参数
+     * @return 无
+     */
+    @PreAuthorize("hasAuthority('system:role:update')")
+    @PutMapping("/status")
+    public Result<Void> updateStatus(@Valid @RequestBody RoleUpdateStatusRequest request) {
+        sysRoleService.updateRoleStatus(request);
         return Result.success();
     }
 }

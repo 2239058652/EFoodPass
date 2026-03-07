@@ -1,10 +1,7 @@
 package com.epass.food.modules.system.role.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
-import com.epass.food.modules.system.role.dto.RoleAssignPermissionRequest;
-import com.epass.food.modules.system.role.dto.RoleCreateRequest;
-import com.epass.food.modules.system.role.dto.RoleListQuery;
-import com.epass.food.modules.system.role.dto.RoleListResponse;
+import com.epass.food.modules.system.role.dto.*;
 import com.epass.food.modules.system.role.entity.SysRole;
 
 import java.util.List;
@@ -40,4 +37,11 @@ public interface SysRoleService extends IService<SysRole> {
      * @param request 分配权限请求参数
      */
     void assignPermissions(RoleAssignPermissionRequest request);
+
+    /**
+     * 修改角色状态
+     *
+     * @param request 修改角色状态请求参数
+     */
+    void updateRoleStatus(RoleUpdateStatusRequest request);
 }

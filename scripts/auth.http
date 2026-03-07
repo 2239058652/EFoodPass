@@ -11,8 +11,8 @@ POST {{baseUrl}}/auth/login
 Content-Type: application/json
 
 {
-  "username": "admin",
-  "password": "Admin@123"
+  "username": "user1",
+  "password": "User1@123"
 }
 
 ### 获取用户信息
@@ -105,4 +105,34 @@ Authorization: Bearer {{adminToken}}
   "path": "/food-category/list",
   "method": "GET",
   "status": 1
+}
+
+### 修改用户状态接口
+PUT {{baseUrl}}/system/user/status
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "userId": 1,
+  "status": 0
+}
+
+### 修改角色状态
+PUT {{baseUrl}}/system/role/status
+Authorization: Bearer {{adminToken}}
+Content-Type: application/json
+
+{
+  "roleId": 3,
+  "status": 0
+}
+
+### 修改权限状态接口
+PUT {{baseUrl}}/system/permission/status
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "permissionId": 1,
+  "status": 0
 }

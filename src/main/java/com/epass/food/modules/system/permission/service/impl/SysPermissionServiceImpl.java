@@ -5,6 +5,7 @@ import com.epass.food.common.exception.BusinessException;
 import com.epass.food.modules.system.permission.dto.PermissionCreateRequest;
 import com.epass.food.modules.system.permission.dto.PermissionListQuery;
 import com.epass.food.modules.system.permission.dto.PermissionListResponse;
+import com.epass.food.modules.system.permission.dto.PermissionUpdateStatusRequest;
 import com.epass.food.modules.system.permission.entity.SysPermission;
 import com.epass.food.modules.system.permission.entity.SysRolePermission;
 import com.epass.food.modules.system.permission.mapper.SysPermissionMapper;
@@ -150,5 +151,29 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         permission.setStatus(request.getStatus());
 
         sysPermissionMapper.insert(permission);
+    }
+
+    /**
+     * 修改权限状态
+     *
+     * @param request 修改权限状态请求参数
+     */
+    @Override
+    public void updatePermissionStatus(PermissionUpdateStatusRequest request) {
+        SysPermission permission = sysPermissionMapper.selectById(request.getPermissionId());
+        if (permission == null) {
+            throw new BusinessException(4008, "权限不存在");
+        }
+
+        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
+            throw new BusinessException(4014, "权限状态值不合法");
+        }
+
+        if ("admin:dashboard".equals(permission.getPermCode()) && Integer.valueOf(0).equals(request.getStatus())) {
+            throw new BusinessException(4015, "核心权限不能被禁用");
+        }
+
+        permission.setStatus(request.getStatus());
+        sysPermissionMapper.updateById(permission);
     }
 }
