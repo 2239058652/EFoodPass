@@ -49,7 +49,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         // 生成 JWT token 返回登录响应结果带上 token
-        String token = jwtTokenProvider.createToken(user.getId(), user.getUsername());
+        String token = jwtTokenProvider.createToken(user.getId(), user.getUsername(), user.getTokenVersion());
         return new LoginResponse(user.getId(), user.getUsername(), user.getNickname(), token);
 
     }

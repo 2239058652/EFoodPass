@@ -31,7 +31,7 @@ public class JwtTokenProvider {
      * @param username 用户名
      * @return 生成的 JWT 令牌
      */
-    public String createToken(Long userId, String username) {
+    public String createToken(Long userId, String username, Integer tokenVersion) {
         SecretKey key = Keys.hmacShaKeyFor(jwtProperties.getSecret().getBytes(StandardCharsets.UTF_8));
         Instant now = Instant.now();
         Instant expireAt = now.plusSeconds(jwtProperties.getExpireSeconds());
@@ -39,6 +39,7 @@ public class JwtTokenProvider {
         return Jwts.builder()
                 .subject(String.valueOf(userId))
                 .claim("username", username)
+                .claim("tokenVersion", tokenVersion)
                 .issuedAt(Date.from(now))
                 .expiration(Date.from(expireAt))
                 .signWith(key)
