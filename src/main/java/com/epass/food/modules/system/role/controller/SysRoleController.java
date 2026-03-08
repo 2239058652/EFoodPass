@@ -70,4 +70,43 @@ public class SysRoleController {
         sysRoleService.updateRoleStatus(request);
         return Result.success();
     }
+
+    /**
+     * 删除角色
+     *
+     * @param id 角色ID
+     * @return 无
+     */
+    @PreAuthorize("hasAuthority('system:role:delete')")
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        sysRoleService.deleteRole(id);
+        return Result.success();
+    }
+
+    /**
+     * 角色详情
+     *
+     * @param id 角色ID
+     * @return 角色详情
+     */
+    @PreAuthorize("hasAuthority('system:role:list')")
+    @GetMapping("/{id}")
+    public Result<RoleDetailResponse> detail(@PathVariable Long id) {
+        RoleDetailResponse response = sysRoleService.getRoleDetail(id);
+        return Result.success(response);
+    }
+
+    /**
+     * 修改角色基础信息
+     *
+     * @param request 更新角色请求参数
+     */
+    @PreAuthorize("hasAuthority('system:role:update')")
+    @PutMapping
+    public Result<Void> update(@Valid @RequestBody RoleUpdateRequest request) {
+        sysRoleService.updateRole(request);
+        return Result.success();
+    }
+
 }

@@ -70,4 +70,54 @@ public class SysUserController {
         sysUserService.updateUserStatus(request);
         return Result.success();
     }
+
+    /**
+     * 删除用户
+     *
+     * @param id 用户ID
+     */
+    @PreAuthorize("hasAuthority('system:user:delete')")
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable("id") Long id) {
+        sysUserService.deleteUser(id);
+        return Result.success();
+    }
+
+    /**
+     * 更新用户
+     *
+     * @param request 更新用户请求参数
+     */
+    @PreAuthorize("hasAuthority('system:user:update')")
+    @PutMapping
+    public Result<Void> update(@Valid @RequestBody UserUpdateRequest request) {
+        sysUserService.updateUser(request);
+        return Result.success();
+    }
+
+    /**
+     * 重置用户密码
+     *
+     * @param request 重置密码请求参数
+     */
+    @PreAuthorize("hasAuthority('system:user:update')")
+    @PutMapping("/reset-password")
+    public Result<Void> resetPassword(@Valid @RequestBody UserResetPasswordRequest request) {
+        sysUserService.resetPassword(request);
+        return Result.success();
+    }
+
+    /**
+     * 获取用户详情 / 角色回显接口
+     *
+     * @param id 用户ID
+     * @return 用户详情
+     */
+    @PreAuthorize("hasAuthority('system:user:list')")
+    @GetMapping("/{id}")
+    public Result<UserDetailResponse> detail(@PathVariable Long id) {
+        UserDetailResponse response = sysUserService.getUserDetail(id);
+        return Result.success(response);
+    }
+
 }

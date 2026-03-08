@@ -179,4 +179,93 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         role.setStatus(request.getStatus());
         this.updateById(role);
     }
+
+    /**
+     * 删除角色
+     *
+     * @param roleId 角色ID
+     */
+    @Override
+    public void deleteRole(Long roleId) {
+        SysRole role = this.getById(roleId);
+        if (role == null) {
+            throw new BusinessException(4007, "角色不存在");
+        }
+
+        if ("ADMIN".equals(role.getRoleCode())) {
+            throw new BusinessException(4017, "系统管理员角色不能被删除");
+        }
+
+        sysUserRoleMapper.delete(
+                new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getRoleId, roleId)
+        );
+
+        sysRolePermissionMapper.delete(
+                new LambdaQueryWrapper<SysRolePermission>()
+                        .eq(SysRolePermission::getRoleId, roleId)
+        );
+
+        this.removeById(roleId);
+    }
+
+    /**
+     * 获取角色详情
+     *
+     * @param roleId 角色ID
+     * @return 角色详情
+     */
+    @Override
+    public RoleDetailResponse getRoleDetail(Long roleId) {
+        SysRole role = this.getById(roleId);
+        if (role == null) {
+            throw new BusinessException(4007, "角色不存在");
+        }
+
+        List<SysRolePermission> rolePermissionList = sysRolePermissionMapper.selectList(
+                new LambdaQueryWrapper<SysRolePermission>()
+                        .eq(SysRolePermission::getRoleId, roleId)
+        );
+
+        List<Long> permissionIds = new ArrayList<>();
+        for (SysRolePermission rolePermission : rolePermissionList) {
+            permissionIds.add(rolePermission.getPermissionId());
+        }
+
+        RoleDetailResponse response = new RoleDetailResponse();
+        response.setId(role.getId());
+        response.setRoleCode(role.getRoleCode());
+        response.setRoleName(role.getRoleName());
+        response.setStatus(role.getStatus());
+        response.setPermissionIds(permissionIds);
+
+        return response;
+    }
+
+    /**
+     * 修改角色基础信息
+     *
+     * @param request 修改角色请求参数
+     */
+    @Override
+    public void updateRole(RoleUpdateRequest request) {
+        SysRole role = this.getById(request.getId());
+        if (role == null) {
+            throw new BusinessException(4007, "角色不存在");
+        }
+
+        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
+            throw new BusinessException(4012, "角色状态值不合法");
+        }
+
+        if ("ADMIN".equals(role.getRoleCode()) && Integer.valueOf(0).equals(request.getStatus())) {
+            throw new BusinessException(4013, "系统管理员角色不能被禁用");
+        }
+
+        role.setRoleName(request.getRoleName());
+        role.setStatus(request.getStatus());
+
+        this.updateById(role);
+    }
+
 }

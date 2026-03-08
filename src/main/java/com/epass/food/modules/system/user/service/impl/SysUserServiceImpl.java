@@ -186,4 +186,111 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         user.setStatus(request.getStatus());
         this.updateById(user);
     }
+
+    /**
+     * 删除用户
+     *
+     * @param userId 用户ID
+     */
+    @Override
+    public void deleteUser(Long userId) {
+        SysUser user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException(4004, "用户不存在");
+        }
+
+        if ("admin".equals(user.getUsername())) {
+            throw new BusinessException(4016, "系统管理员不能被删除");
+        }
+
+        sysUserRoleMapper.delete(
+                new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getUserId, userId)
+        );
+
+        this.removeById(userId);
+    }
+
+    /**
+     * 修改用户信息
+     *
+     * @param request 修改用户信息的请求参数
+     */
+    @Override
+    public void updateUser(UserUpdateRequest request) {
+        SysUser user = this.getById(request.getId());
+        if (user == null) {
+            throw new BusinessException(4004, "用户不存在");
+        }
+
+        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
+            throw new BusinessException(4010, "用户状态值不合法");
+        }
+
+        if ("admin".equals(user.getUsername()) && Integer.valueOf(0).equals(request.getStatus())) {
+            throw new BusinessException(4011, "系统管理员不能被禁用");
+        }
+
+        user.setNickname(request.getNickname());
+        user.setPhone(request.getPhone());
+        user.setStatus(request.getStatus());
+
+        this.updateById(user);
+    }
+
+    /**
+     * 重置密码
+     * 旧的token 已失效
+     *
+     * @param request 重置密码的请求参数
+     */
+    @Override
+    public void resetPassword(UserResetPasswordRequest request) {
+        SysUser user = this.getById(request.getUserId());
+        if (user == null) {
+            throw new BusinessException(4004, "用户不存在");
+        }
+
+        user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
+
+        Integer oldVersion = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
+        user.setTokenVersion(oldVersion + 1);
+
+        this.updateById(user);
+    }
+
+    /**
+     * 获取用户详情
+     *
+     * @param userId 用户ID
+     * @return 用户详情
+     */
+    @Override
+    public UserDetailResponse getUserDetail(Long userId) {
+        SysUser user = this.getById(userId);
+        if (user == null) {
+            throw new BusinessException(4004, "用户不存在");
+        }
+
+        List<SysUserRole> userRoleList = sysUserRoleMapper.selectList(
+                new LambdaQueryWrapper<SysUserRole>()
+                        .eq(SysUserRole::getUserId, userId)
+        );
+
+        List<Long> roleIds = new ArrayList<>();
+        for (SysUserRole userRole : userRoleList) {
+            roleIds.add(userRole.getRoleId());
+        }
+
+        UserDetailResponse response = new UserDetailResponse();
+        response.setId(user.getId());
+        response.setUsername(user.getUsername());
+        response.setNickname(user.getNickname());
+        response.setPhone(user.getPhone());
+        response.setStatus(user.getStatus());
+        response.setRoleIds(roleIds);
+
+        return response;
+    }
+
 }

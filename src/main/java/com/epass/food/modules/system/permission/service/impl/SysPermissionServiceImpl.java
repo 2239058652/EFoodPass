@@ -2,10 +2,7 @@ package com.epass.food.modules.system.permission.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.epass.food.common.exception.BusinessException;
-import com.epass.food.modules.system.permission.dto.PermissionCreateRequest;
-import com.epass.food.modules.system.permission.dto.PermissionListQuery;
-import com.epass.food.modules.system.permission.dto.PermissionListResponse;
-import com.epass.food.modules.system.permission.dto.PermissionUpdateStatusRequest;
+import com.epass.food.modules.system.permission.dto.*;
 import com.epass.food.modules.system.permission.entity.SysPermission;
 import com.epass.food.modules.system.permission.entity.SysRolePermission;
 import com.epass.food.modules.system.permission.mapper.SysPermissionMapper;
@@ -176,4 +173,89 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         permission.setStatus(request.getStatus());
         sysPermissionMapper.updateById(permission);
     }
+
+    /**
+     * 删除权限
+     *
+     * @param permissionId 权限ID
+     */
+    @Override
+    public void deletePermission(Long permissionId) {
+        SysPermission permission = sysPermissionMapper.selectById(permissionId);
+        if (permission == null) {
+            throw new BusinessException(4008, "权限不存在");
+        }
+
+        if ("admin:dashboard".equals(permission.getPermCode())) {
+            throw new BusinessException(4018, "核心权限不能被删除");
+        }
+
+        sysRolePermissionMapper.delete(
+                new LambdaQueryWrapper<SysRolePermission>()
+                        .eq(SysRolePermission::getPermissionId, permissionId)
+        );
+
+        sysPermissionMapper.deleteById(permissionId);
+    }
+
+    /**
+     * 修改权限基础信息
+     *
+     * @param request 修改权限请求参数
+     */
+    @Override
+    public void updatePermission(PermissionUpdateRequest request) {
+        SysPermission permission = sysPermissionMapper.selectById(request.getId());
+        if (permission == null) {
+            throw new BusinessException(4008, "权限不存在");
+        }
+
+        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
+            throw new BusinessException(4014, "权限状态值不合法");
+        }
+
+        if (!Integer.valueOf(1).equals(request.getPermType())
+                && !Integer.valueOf(2).equals(request.getPermType())
+                && !Integer.valueOf(3).equals(request.getPermType())) {
+            throw new BusinessException(4019, "权限类型值不合法");
+        }
+
+        if ("admin:dashboard".equals(permission.getPermCode()) && Integer.valueOf(0).equals(request.getStatus())) {
+            throw new BusinessException(4015, "核心权限不能被禁用");
+        }
+
+        permission.setPermName(request.getPermName());
+        permission.setPermType(request.getPermType());
+        permission.setPath(request.getPath());
+        permission.setMethod(request.getMethod());
+        permission.setStatus(request.getStatus());
+
+        sysPermissionMapper.updateById(permission);
+    }
+
+    /**
+     * 查询权限详情
+     *
+     * @param permissionId 权限ID
+     * @return 权限详情
+     */
+    @Override
+    public PermissionDetailResponse getPermissionDetail(Long permissionId) {
+        SysPermission permission = sysPermissionMapper.selectById(permissionId);
+        if (permission == null) {
+            throw new BusinessException(4008, "权限不存在");
+        }
+
+        PermissionDetailResponse response = new PermissionDetailResponse();
+        response.setId(permission.getId());
+        response.setPermCode(permission.getPermCode());
+        response.setPermName(permission.getPermName());
+        response.setPermType(permission.getPermType());
+        response.setPath(permission.getPath());
+        response.setMethod(permission.getMethod());
+        response.setStatus(permission.getStatus());
+
+        return response;
+    }
+
 }

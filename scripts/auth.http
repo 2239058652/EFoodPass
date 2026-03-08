@@ -1,9 +1,9 @@
 @baseUrl = http://localhost:5603
-@adminToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyODkzNDAzLCJleHAiOjE3NzI5MDA2MDN9.YhXPGNNej1H2CRRlb8OXkCQYcUaSE_lVRgMchtZzoi3krkqra1LOX9XArcO0yWepTwQyNOu4P3b6JJ6510hNjw
-@userToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ1c2VyMSIsInRva2VuVmVyc2lvbiI6MCwiaWF0IjoxNzcyODg1NzA0LCJleHAiOjE3NzI4OTI5MDR9.CSvxyqoxSY5geXdTxzogs_gRLmMdVrLTWCrbjNfgKd8x0RGJu7EaF7RPsmPlFif0ChTxOAmBrxCojOWOu7LwxQ
+@adminToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyOTM5MjkyLCJleHAiOjE3NzI5NDY0OTJ9.HCIe-lqqRLpGSrnOykHaFI_rHLPqlmfrhMsgAVPk4q9OxgOG4QEFAKzW84oHyYAKWIxwph3N23uIZ16TL9BUKA
+@userToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ1c2VyMSIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyOTM5Mzg4LCJleHAiOjE3NzI5NDY1ODh9.-JrIuiMb-6FLI2yrN8hTUzd0XG_cMzhchHz1gKnLaRe4wUrq_1e4VZ1QfWk-S5Sp8q68j6Ut9f7UkZrCvNH5wQ
 # 测试账号密码
 # 管理员： admin Admin@123
-# 普通用户： user1 User1@123
+# 普通用户： user1 User@123
 # 测试用户 user2 User@123
 
 ### 登录
@@ -12,7 +12,7 @@ Content-Type: application/json
 
 {
   "username": "user1",
-  "password": "User1@123"
+  "password": "User@123"
 }
 
 ### 获取用户信息
@@ -136,3 +136,74 @@ Authorization: Bearer {{adminToken}}
   "permissionId": 1,
   "status": 0
 }
+
+### 删除用户接口
+DELETE {{baseUrl}}/system/user/1
+Authorization: Bearer {{adminToken}}
+
+### 删除角色接口
+DELETE {{baseUrl}}/system/role/1
+Authorization: Bearer {{adminToken}}
+
+### 删除权限接口
+DELETE {{baseUrl}}/system/permission/1
+Authorization: Bearer {{userToken}}
+
+### 修改用户基础信息接口
+PUT {{baseUrl}}/system/user
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "id": 2,
+  "nickname": "普通用户A",
+  "phone": "13911112222",
+  "status": 1
+}
+
+### 重置用户密码接口
+PUT {{baseUrl}}/system/user/reset-password
+Content-Type: application/json
+Authorization: Bearer {{userToken}}
+
+{
+  "userId": 2,
+  "newPassword": "User@123"
+}
+
+### 角色详情/权限回显接口
+GET {{baseUrl}}/system/role/1
+Authorization: Bearer {{adminToken}}
+
+### 用户详情 / 角色回显接口
+GET {{baseUrl}}/system/user/4
+Authorization: Bearer {{adminToken}}
+
+### 修改角色基础信息接口
+PUT {{baseUrl}}/system/role
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "id": 3,
+  "roleName": "门店店长",
+  "status": 1
+}
+
+### 修改权限基础信息接口
+PUT {{baseUrl}}/system/permission
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "id": 16,
+  "permName": "菜品分类列表查看",
+  "permType": 3,
+  "path": "/food-category/list",
+  "method": "GET",
+  "status": 1
+}
+
+### 权限详情接口
+GET {{baseUrl}}/system/permission/16
+Authorization: Bearer {{adminToken}}

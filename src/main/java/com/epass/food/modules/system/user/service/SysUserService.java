@@ -39,4 +39,34 @@ public interface SysUserService extends IService<SysUser> {
      * @param request 修改用户状态请求参数
      */
     void updateUserStatus(UserUpdateStatusRequest request);
+
+    /**
+     * 删除用户
+     *
+     * @param userId 用户ID
+     */
+    void deleteUser(Long userId);
+
+    /**
+     * 修改用户基础信息
+     *
+     * @param request 修改用户请求参数
+     */
+    void updateUser(UserUpdateRequest request);
+
+    /**
+     * 重置用户密码
+     *
+     * @param request 重置密码请求参数
+     */
+    void resetPassword(UserResetPasswordRequest request);
+
+    /**
+     * 查询用户详情
+     *
+     * @param userId 用户ID
+     * @return 用户详情
+     */
+    UserDetailResponse getUserDetail(Long userId);
+
 }

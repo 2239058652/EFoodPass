@@ -44,4 +44,27 @@ public interface SysRoleService extends IService<SysRole> {
      * @param request 修改角色状态请求参数
      */
     void updateRoleStatus(RoleUpdateStatusRequest request);
+
+    /**
+     * 删除角色
+     *
+     * @param roleId 角色ID
+     */
+    void deleteRole(Long roleId);
+
+    /**
+     * 查询角色详情
+     *
+     * @param roleId 角色ID
+     * @return 角色详情
+     */
+    RoleDetailResponse getRoleDetail(Long roleId);
+
+    /**
+     * 修改角色基础信息
+     *
+     * @param request 修改角色请求参数
+     */
+    void updateRole(RoleUpdateRequest request);
+
 }

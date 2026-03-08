@@ -1,9 +1,6 @@
 package com.epass.food.modules.system.permission.service;
 
-import com.epass.food.modules.system.permission.dto.PermissionCreateRequest;
-import com.epass.food.modules.system.permission.dto.PermissionListQuery;
-import com.epass.food.modules.system.permission.dto.PermissionListResponse;
-import com.epass.food.modules.system.permission.dto.PermissionUpdateStatusRequest;
+import com.epass.food.modules.system.permission.dto.*;
 
 import java.util.List;
 
@@ -38,4 +35,27 @@ public interface SysPermissionService {
      * @param request 修改权限状态请求参数
      */
     void updatePermissionStatus(PermissionUpdateStatusRequest request);
+
+    /**
+     * 删除权限
+     *
+     * @param permissionId 权限ID
+     */
+    void deletePermission(Long permissionId);
+
+    /**
+     * 修改权限基础信息
+     *
+     * @param request 修改权限请求参数
+     */
+    void updatePermission(PermissionUpdateRequest request);
+
+    /**
+     * 查询权限详情
+     *
+     * @param permissionId 权限ID
+     * @return 权限详情
+     */
+    PermissionDetailResponse getPermissionDetail(Long permissionId);
+
 }

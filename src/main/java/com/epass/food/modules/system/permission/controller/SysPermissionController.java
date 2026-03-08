@@ -1,10 +1,7 @@
 package com.epass.food.modules.system.permission.controller;
 
 import com.epass.food.common.result.Result;
-import com.epass.food.modules.system.permission.dto.PermissionCreateRequest;
-import com.epass.food.modules.system.permission.dto.PermissionListQuery;
-import com.epass.food.modules.system.permission.dto.PermissionListResponse;
-import com.epass.food.modules.system.permission.dto.PermissionUpdateStatusRequest;
+import com.epass.food.modules.system.permission.dto.*;
 import com.epass.food.modules.system.permission.service.SysPermissionService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -58,4 +55,42 @@ public class SysPermissionController {
         sysPermissionService.updatePermissionStatus(request);
         return Result.success();
     }
+
+    /**
+     * 删除权限
+     *
+     * @param id 权限ID
+     */
+    @PreAuthorize("hasAuthority('system:permission:delete')")
+    @DeleteMapping("/{id}")
+    public Result<Void> delete(@PathVariable Long id) {
+        sysPermissionService.deletePermission(id);
+        return Result.success();
+    }
+
+    /**
+     * 修改权限基础信息
+     *
+     * @param request 修改权限请求参数
+     */
+    @PreAuthorize("hasAuthority('system:permission:update')")
+    @PutMapping
+    public Result<Void> update(@Valid @RequestBody PermissionUpdateRequest request) {
+        sysPermissionService.updatePermission(request);
+        return Result.success();
+    }
+
+    /**
+     * 查询权限详情
+     *
+     * @param id 权限ID
+     * @return 权限详情
+     */
+    @PreAuthorize("hasAuthority('system:permission:list')")
+    @GetMapping("/{id}")
+    public Result<PermissionDetailResponse> detail(@PathVariable("id") Long id) {
+        PermissionDetailResponse response = sysPermissionService.getPermissionDetail(id);
+        return Result.success(response);
+    }
+
 }
