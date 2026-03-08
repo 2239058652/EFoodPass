@@ -1,14 +1,18 @@
 package com.epass.food.modules.system.user.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.epass.food.common.page.PageResult;
 import com.epass.food.modules.system.user.dto.*;
 import com.epass.food.modules.system.user.entity.SysUser;
 
-import java.util.List;
-
 public interface SysUserService extends IService<SysUser> {
 
-    // 根据用户名查询用户
+    /**
+     * 根据用户名查询用户信息
+     *
+     * @param username
+     * @return 用户信息
+     */
     SysUser getByUsername(String username);
 
     /**
@@ -17,7 +21,7 @@ public interface SysUserService extends IService<SysUser> {
      * @param query 查询条件
      * @return 用户列表
      */
-    List<UserListResponse> listUsers(UserListQuery query);
+    PageResult<UserListResponse> listUsers(UserListQuery query);
 
     /**
      * 创建用户

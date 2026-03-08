@@ -207,3 +207,8 @@ Authorization: Bearer {{adminToken}}
 ### 权限详情接口
 GET {{baseUrl}}/system/permission/16
 Authorization: Bearer {{adminToken}}
+
+### 获取用户列表
+GET {{baseUrl}}/system/user/list?pageNum=1&pageSize=1
+Authorization: Bearer {{adminToken}}
+

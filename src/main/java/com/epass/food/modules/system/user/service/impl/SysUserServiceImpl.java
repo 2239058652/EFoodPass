@@ -1,8 +1,10 @@
 package com.epass.food.modules.system.user.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.epass.food.common.exception.BusinessException;
+import com.epass.food.common.page.PageResult;
 import com.epass.food.modules.system.role.entity.SysRole;
 import com.epass.food.modules.system.role.entity.SysUserRole;
 import com.epass.food.modules.system.role.mapper.SysRoleMapper;
@@ -12,6 +14,7 @@ import com.epass.food.modules.system.user.dto.*;
 import com.epass.food.modules.system.user.entity.SysUser;
 import com.epass.food.modules.system.user.mapper.SysUserMapper;
 import com.epass.food.modules.system.user.service.SysUserService;
+import lombok.NonNull;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -35,6 +38,30 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         this.passwordEncoder = passwordEncoder;
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRoleMapper = sysRoleMapper;
+    }
+
+    /**
+     * 内部私有方法
+     * 获取用户列表响应对象
+     *
+     * @param user     用户对象
+     * @param roleList 角色列表
+     * @return 用户列表响应对象
+     */
+    private static @NonNull UserListResponse getUserListResponse(SysUser user, List<SysRole> roleList) {
+        List<String> roleCodes = new ArrayList<>();
+        for (SysRole role : roleList) {
+            roleCodes.add(role.getRoleCode());
+        }
+
+        UserListResponse response = new UserListResponse();
+        response.setId(user.getId());
+        response.setUsername(user.getUsername());
+        response.setNickname(user.getNickname());
+        response.setPhone(user.getPhone());
+        response.setStatus(user.getStatus());
+        response.setRoleCodes(roleCodes);
+        return response;
     }
 
     /**
@@ -68,7 +95,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      * @return 用户列表
      */
     @Override
-    public List<UserListResponse> listUsers(UserListQuery query) {
+    public PageResult<UserListResponse> listUsers(UserListQuery query) {
         LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
 
         if (query != null && StringUtils.hasText(query.getUsername())) {
@@ -81,29 +108,26 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         queryWrapper.orderByDesc(SysUser::getId); // 按 ID 倒序排列（最新数据在前面）
 
-        List<SysUser> userList = this.list(queryWrapper);
+        Page<SysUser> page = new Page<>(query.getPageNum(), query.getPageSize());
+        Page<SysUser> userPage = this.page(page, queryWrapper); // 分页查询
+        List<SysUser> userList = userPage.getRecords(); // 取出当前页的数据列表
 
         List<UserListResponse> responseList = new ArrayList<>();
         for (SysUser user : userList) {
             List<SysRole> roleList = sysRoleService.getRolesByUserId(user.getId());
 
-            List<String> roleCodes = new ArrayList<>();
-            for (SysRole role : roleList) {
-                roleCodes.add(role.getRoleCode());
-            }
-
-            UserListResponse response = new UserListResponse();
-            response.setId(user.getId());
-            response.setUsername(user.getUsername());
-            response.setNickname(user.getNickname());
-            response.setPhone(user.getPhone());
-            response.setStatus(user.getStatus());
-            response.setRoleCodes(roleCodes);
+            UserListResponse response = getUserListResponse(user, roleList);
 
             responseList.add(response);
         }
 
-        return responseList;
+        PageResult<UserListResponse> result = new PageResult<>();
+        result.setTotal(userPage.getTotal());
+        result.setPageNum(userPage.getCurrent());
+        result.setPageSize(userPage.getSize());
+        result.setRecords(responseList);
+
+        return result;
     }
 
     /**

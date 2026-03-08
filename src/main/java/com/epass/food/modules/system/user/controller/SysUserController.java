@@ -1,13 +1,12 @@
 package com.epass.food.modules.system.user.controller;
 
+import com.epass.food.common.page.PageResult;
 import com.epass.food.common.result.Result;
 import com.epass.food.modules.system.user.dto.*;
 import com.epass.food.modules.system.user.service.SysUserService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/system/user")
@@ -27,9 +26,9 @@ public class SysUserController {
      */
     @PreAuthorize("hasAuthority('system:user:list')")
     @GetMapping("/list")
-    public Result<List<UserListResponse>> list(UserListQuery query) {
-        List<UserListResponse> userList = sysUserService.listUsers(query);
-        return Result.success(userList);
+    public Result<PageResult<UserListResponse>> list(UserListQuery query) {
+        PageResult<UserListResponse> userPage = sysUserService.listUsers(query);
+        return Result.success(userPage);
     }
 
     /**
