@@ -1,13 +1,12 @@
 package com.epass.food.modules.system.role.controller;
 
+import com.epass.food.common.page.PageResult;
 import com.epass.food.common.result.Result;
 import com.epass.food.modules.system.role.dto.*;
 import com.epass.food.modules.system.role.service.SysRoleService;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/system/role")
@@ -23,12 +22,12 @@ public class SysRoleController {
      * 查询角色列表
      *
      * @param query 查询条件
-     * @return 角色列表
+     * @return 角色列表（带分页）
      */
     @PreAuthorize("hasAuthority('system:role:list')")
     @GetMapping("/list")
-    public Result<List<RoleListResponse>> list(RoleListQuery query) {
-        List<RoleListResponse> roleList = sysRoleService.listRoles(query);
+    public Result<PageResult<RoleListResponse>> list(RoleListQuery query) {
+        PageResult<RoleListResponse> roleList = sysRoleService.listRoles(query);
         return Result.success(roleList);
     }
 

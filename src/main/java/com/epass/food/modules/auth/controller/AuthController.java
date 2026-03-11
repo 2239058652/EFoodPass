@@ -8,10 +8,7 @@ import com.epass.food.modules.auth.dto.LoginResponse;
 import com.epass.food.modules.auth.service.AuthService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/auth")
@@ -26,7 +23,7 @@ public class AuthController {
     /**
      * 登录 接口
      */
-    @RequestMapping("/login")
+    @PostMapping("/login")
     public Result<LoginResponse> login(@Valid @RequestBody LoginRequest request) {
         LoginResponse response = authService.login(request);
         return Result.success(response);

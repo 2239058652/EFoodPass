@@ -357,5 +357,3 @@ Current state:
 - user list pagination has already started/landed in code
 - role/permission list pagination is the clearest next technical step
 - business modules have not started yet and should wait until system-management groundwork is stable
-
-先阅读 PROJECT_HANDOFF.md，然后继续这个项目。保持教学式、一步一步带我做，不要直接全包代做。先检查当前代码状态，再从文档里记录的“下一步推荐顺序”继续。

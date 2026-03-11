@@ -1,5 +1,6 @@
 package com.epass.food.modules.system.permission.service;
 
+import com.epass.food.common.page.PageResult;
 import com.epass.food.modules.system.permission.dto.*;
 
 import java.util.List;
@@ -20,7 +21,7 @@ public interface SysPermissionService {
      * @param query 查询条件
      * @return 权限列表
      */
-    List<PermissionListResponse> listPermissions(PermissionListQuery query);
+    PageResult<PermissionListResponse> listPermissions(PermissionListQuery query);
 
     /**
      * 新增权限

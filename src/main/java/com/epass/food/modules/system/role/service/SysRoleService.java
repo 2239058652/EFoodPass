@@ -1,6 +1,7 @@
 package com.epass.food.modules.system.role.service;
 
 import com.baomidou.mybatisplus.extension.service.IService;
+import com.epass.food.common.page.PageResult;
 import com.epass.food.modules.system.role.dto.*;
 import com.epass.food.modules.system.role.entity.SysRole;
 
@@ -22,7 +23,7 @@ public interface SysRoleService extends IService<SysRole> {
      * @param query 查询条件
      * @return 角色列表
      */
-    List<RoleListResponse> listRoles(RoleListQuery query);
+    PageResult<RoleListResponse> listRoles(RoleListQuery query);
 
     /**
      * 新增角色

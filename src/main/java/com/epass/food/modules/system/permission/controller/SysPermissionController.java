@@ -1,5 +1,6 @@
 package com.epass.food.modules.system.permission.controller;
 
+import com.epass.food.common.page.PageResult;
 import com.epass.food.common.result.Result;
 import com.epass.food.modules.system.permission.dto.*;
 import com.epass.food.modules.system.permission.service.SysPermissionService;
@@ -7,7 +8,6 @@ import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 
 @RestController
 @RequestMapping("/system/permission")
@@ -27,8 +27,8 @@ public class SysPermissionController {
      */
     @PreAuthorize("hasAuthority('system:permission:list')")
     @GetMapping("/list")
-    public Result<List<PermissionListResponse>> list(PermissionListQuery query) {
-        List<PermissionListResponse> permissionList = sysPermissionService.listPermissions(query);
+    public Result<PageResult<PermissionListResponse>> list(PermissionListQuery query) {
+        PageResult<PermissionListResponse> permissionList = sysPermissionService.listPermissions(query);
         return Result.success(permissionList);
     }
 

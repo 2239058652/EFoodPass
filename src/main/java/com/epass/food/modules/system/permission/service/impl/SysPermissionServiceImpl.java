@@ -1,7 +1,9 @@
 package com.epass.food.modules.system.permission.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.epass.food.common.exception.BusinessException;
+import com.epass.food.common.page.PageResult;
 import com.epass.food.modules.system.permission.dto.*;
 import com.epass.food.modules.system.permission.entity.SysPermission;
 import com.epass.food.modules.system.permission.entity.SysRolePermission;
@@ -30,6 +32,30 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         this.sysRoleService = sysRoleService;
         this.sysRolePermissionMapper = sysRolePermissionMapper;
         this.sysPermissionMapper = sysPermissionMapper;
+    }
+
+    /**
+     * 校验权限状态
+     *
+     * @param status 权限状态
+     */
+    private void validatePermissionStatus(Integer status) {
+        if (!Integer.valueOf(0).equals(status) && !Integer.valueOf(1).equals(status)) {
+            throw new BusinessException(4014, "权限状态值不合法");
+        }
+    }
+
+    /**
+     * 校验权限类型
+     *
+     * @param permType 权限类型
+     */
+    private void validatePermissionType(Integer permType) {
+        if (!Integer.valueOf(1).equals(permType)
+                && !Integer.valueOf(2).equals(permType)
+                && !Integer.valueOf(3).equals(permType)) {
+            throw new BusinessException(4019, "权限类型值不合法");
+        }
     }
 
     /**
@@ -93,20 +119,26 @@ public class SysPermissionServiceImpl implements SysPermissionService {
     }
 
     @Override
-    public List<PermissionListResponse> listPermissions(PermissionListQuery query) {
+    public PageResult<PermissionListResponse> listPermissions(PermissionListQuery query) {
+        if (query == null) {
+            query = new PermissionListQuery();
+        }
+
         LambdaQueryWrapper<SysPermission> queryWrapper = new LambdaQueryWrapper<>();
 
-        if (query != null && StringUtils.hasText(query.getPermCode())) {
+        if (StringUtils.hasText(query.getPermCode())) {
             queryWrapper.like(SysPermission::getPermCode, query.getPermCode());
         }
 
-        if (query != null && query.getStatus() != null) {
+        if (query.getStatus() != null) {
             queryWrapper.eq(SysPermission::getStatus, query.getStatus());
         }
 
         queryWrapper.orderByDesc(SysPermission::getId);
 
-        List<SysPermission> permissionList = sysPermissionMapper.selectList(queryWrapper);
+        Page<SysPermission> page = new Page<>(query.getPageNum(), query.getPageSize());
+        Page<SysPermission> permissionPage = sysPermissionMapper.selectPage(page, queryWrapper);
+        List<SysPermission> permissionList = permissionPage.getRecords();
 
         List<PermissionListResponse> responseList = new ArrayList<>();
         for (SysPermission permission : permissionList) {
@@ -121,7 +153,12 @@ public class SysPermissionServiceImpl implements SysPermissionService {
             responseList.add(response);
         }
 
-        return responseList;
+        PageResult<PermissionListResponse> result = new PageResult<>();
+        result.setTotal(permissionPage.getTotal());
+        result.setPageNum(permissionPage.getCurrent());
+        result.setPageSize(permissionPage.getSize());
+        result.setRecords(responseList);
+        return result;
     }
 
     /**
@@ -138,6 +175,10 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         if (count != null && count > 0) {
             throw new BusinessException(4009, "权限编码已存在");
         }
+
+        validatePermissionStatus(request.getStatus()); // 权限状态值校验
+
+        validatePermissionType(request.getPermType()); // 权限类型值校验
 
         SysPermission permission = new SysPermission();
         permission.setPermCode(request.getPermCode());
@@ -162,9 +203,7 @@ public class SysPermissionServiceImpl implements SysPermissionService {
             throw new BusinessException(4008, "权限不存在");
         }
 
-        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
-            throw new BusinessException(4014, "权限状态值不合法");
-        }
+        validatePermissionStatus(request.getStatus()); // 权限状态值校验
 
         if ("admin:dashboard".equals(permission.getPermCode()) && Integer.valueOf(0).equals(request.getStatus())) {
             throw new BusinessException(4015, "核心权限不能被禁用");
@@ -210,15 +249,9 @@ public class SysPermissionServiceImpl implements SysPermissionService {
             throw new BusinessException(4008, "权限不存在");
         }
 
-        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
-            throw new BusinessException(4014, "权限状态值不合法");
-        }
+        validatePermissionStatus(request.getStatus()); // 权限状态值校验
 
-        if (!Integer.valueOf(1).equals(request.getPermType())
-                && !Integer.valueOf(2).equals(request.getPermType())
-                && !Integer.valueOf(3).equals(request.getPermType())) {
-            throw new BusinessException(4019, "权限类型值不合法");
-        }
+        validatePermissionType(request.getPermType()); // 权限类型值校验
 
         if ("admin:dashboard".equals(permission.getPermCode()) && Integer.valueOf(0).equals(request.getStatus())) {
             throw new BusinessException(4015, "核心权限不能被禁用");

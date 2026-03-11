@@ -1,9 +1,12 @@
 package com.epass.food.modules.system.permission.dto;
 
+import com.epass.food.common.page.PageQuery;
 import lombok.Data;
+import lombok.EqualsAndHashCode;
 
 @Data
-public class PermissionListQuery {
+@EqualsAndHashCode(callSuper = true)
+public class PermissionListQuery extends PageQuery {
 
     /**
      * 权限编码，支持模糊查询

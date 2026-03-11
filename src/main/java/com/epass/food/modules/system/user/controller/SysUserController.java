@@ -77,7 +77,7 @@ public class SysUserController {
      */
     @PreAuthorize("hasAuthority('system:user:delete')")
     @DeleteMapping("/{id}")
-    public Result<Void> delete(@PathVariable("id") Long id) {
+    public Result<Void> delete(@PathVariable Long id) {
         sysUserService.deleteUser(id);
         return Result.success();
     }

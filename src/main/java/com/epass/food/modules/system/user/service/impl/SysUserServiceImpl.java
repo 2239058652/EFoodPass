@@ -65,6 +65,18 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     }
 
     /**
+     * 内部私有方法
+     * 校验用户状态值
+     *
+     * @param status 用户状态值
+     */
+    private void validateUserStatus(Integer status) {
+        if (!Integer.valueOf(0).equals(status) && !Integer.valueOf(1).equals(status)) {
+            throw new BusinessException(4010, "用户状态值不合法");
+        }
+    }
+
+    /**
      * 根据用户名查询系统用户信息
      *
      * @param username 用户名，用于查询的唯一标识
@@ -96,13 +108,17 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
      */
     @Override
     public PageResult<UserListResponse> listUsers(UserListQuery query) {
+        if (query == null) {
+            query = new UserListQuery();
+        }
+
         LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
 
-        if (query != null && StringUtils.hasText(query.getUsername())) {
+        if (StringUtils.hasText(query.getUsername())) {
             queryWrapper.like(SysUser::getUsername, query.getUsername());  // 用户名模糊查询
         }
 
-        if (query != null && query.getStatus() != null) {
+        if (query.getStatus() != null) {
             queryWrapper.eq(SysUser::getStatus, query.getStatus()); // 按前端传的状态筛选
         }
 
@@ -141,6 +157,8 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         if (existUser != null) {
             throw new BusinessException(4001, "用户名已存在");
         }
+
+        validateUserStatus(request.getStatus()); // 校验用户状态值
 
         SysUser user = new SysUser();
         user.setUsername(request.getUsername());
@@ -199,9 +217,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new BusinessException(4004, "用户不存在");
         }
 
-        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
-            throw new BusinessException(4010, "用户状态值不合法");
-        }
+        validateUserStatus(request.getStatus()); // 校验用户状态值
 
         if ("admin".equals(user.getUsername()) && Integer.valueOf(0).equals(request.getStatus())) {
             throw new BusinessException(4011, "系统管理员不能被禁用");
@@ -247,9 +263,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
             throw new BusinessException(4004, "用户不存在");
         }
 
-        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
-            throw new BusinessException(4010, "用户状态值不合法");
-        }
+        validateUserStatus(request.getStatus()); // 校验用户状态值
 
         if ("admin".equals(user.getUsername()) && Integer.valueOf(0).equals(request.getStatus())) {
             throw new BusinessException(4011, "系统管理员不能被禁用");
@@ -277,7 +291,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
 
-        Integer oldVersion = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
+        int oldVersion = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
         user.setTokenVersion(oldVersion + 1);
 
         this.updateById(user);

@@ -1,8 +1,10 @@
 package com.epass.food.modules.system.role.service.impl;
 
 import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
+import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.epass.food.common.exception.BusinessException;
+import com.epass.food.common.page.PageResult;
 import com.epass.food.modules.system.permission.entity.SysPermission;
 import com.epass.food.modules.system.permission.entity.SysRolePermission;
 import com.epass.food.modules.system.permission.mapper.SysPermissionMapper;
@@ -34,6 +36,18 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
         this.sysUserRoleMapper = sysUserRoleMapper;
         this.sysRolePermissionMapper = sysRolePermissionMapper;
         this.sysPermissionMapper = sysPermissionMapper;
+    }
+
+    /**
+     * 内部私有方法
+     * 校验角色状态值
+     *
+     * @param status 角色状态值
+     */
+    private void validateRoleStatus(Integer status) {
+        if (!Integer.valueOf(0).equals(status) && !Integer.valueOf(1).equals(status)) {
+            throw new BusinessException(4012, "角色状态值不合法");
+        }
     }
 
     /**
@@ -71,21 +85,31 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
      * @return 角色列表
      */
     @Override
-    public List<RoleListResponse> listRoles(RoleListQuery query) {
+    public PageResult<RoleListResponse> listRoles(RoleListQuery query) {
+        if (query == null) {
+            query = new RoleListQuery();
+        }
+
         LambdaQueryWrapper<SysRole> queryWrapper = new LambdaQueryWrapper<>();
 
-        if (query != null && StringUtils.hasText(query.getRoleCode())) {
+        if (StringUtils.hasText(query.getRoleCode())) {
             queryWrapper.like(SysRole::getRoleCode, query.getRoleCode());
         }
 
-        if (query != null && query.getStatus() != null) {
+        if (query.getStatus() != null) {
             queryWrapper.eq(SysRole::getStatus, query.getStatus());
         }
 
         queryWrapper.orderByDesc(SysRole::getId);
 
-        List<SysRole> roleList = this.list(queryWrapper);
+        // 1. 构造 MyBatis-Plus 的 Page 对象进行物理分页
+        Page<SysRole> page = new Page<>(query.getPageNum(), query.getPageSize());
+        Page<SysRole> rolePage = this.page(page, queryWrapper);
 
+        // 2. 取出当前页的数据
+        List<SysRole> roleList = rolePage.getRecords();
+
+        // 3. 将实体类 List 转换为返回给前端的 DTO List
         List<RoleListResponse> responseList = new ArrayList<>();
         for (SysRole role : roleList) {
             RoleListResponse response = new RoleListResponse();
@@ -96,7 +120,14 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             responseList.add(response);
         }
 
-        return responseList;
+        // 4. 封装我们自定义的 PageResult 并返回
+        PageResult<RoleListResponse> result = new PageResult<>();
+        result.setTotal(rolePage.getTotal());
+        result.setPageNum(rolePage.getCurrent());
+        result.setPageSize(rolePage.getSize());
+        result.setRecords(responseList);
+
+        return result;
     }
 
     /**
@@ -106,13 +137,15 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
      */
     @Override
     public void createRole(RoleCreateRequest request) {
-        Long count = this.count(
+        long count = this.count(
                 new LambdaQueryWrapper<SysRole>()
                         .eq(SysRole::getRoleCode, request.getRoleCode())
         );
-        if (count != null && count > 0) {
+        if (count > 0) {
             throw new BusinessException(4006, "角色编码已存在");
         }
+
+        validateRoleStatus(request.getStatus()); // 校验角色状态值
 
         SysRole role = new SysRole();
         role.setRoleCode(request.getRoleCode());
@@ -168,9 +201,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             throw new BusinessException(4007, "角色不存在");
         }
 
-        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
-            throw new BusinessException(4012, "角色状态值不合法");
-        }
+        validateRoleStatus(request.getStatus()); // 校验角色状态值
 
         if ("ADMIN".equals(role.getRoleCode()) && Integer.valueOf(0).equals(request.getStatus())) {
             throw new BusinessException(4013, "系统管理员角色不能被禁用");
@@ -254,9 +285,7 @@ public class SysRoleServiceImpl extends ServiceImpl<SysRoleMapper, SysRole> impl
             throw new BusinessException(4007, "角色不存在");
         }
 
-        if (!Integer.valueOf(0).equals(request.getStatus()) && !Integer.valueOf(1).equals(request.getStatus())) {
-            throw new BusinessException(4012, "角色状态值不合法");
-        }
+        validateRoleStatus(request.getStatus()); // 校验角色状态值
 
         if ("ADMIN".equals(role.getRoleCode()) && Integer.valueOf(0).equals(request.getStatus())) {
             throw new BusinessException(4013, "系统管理员角色不能被禁用");
