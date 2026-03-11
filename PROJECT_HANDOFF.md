@@ -1,4 +1,4 @@
-# EFoodPass Project Handoff
+﻿# EFoodPass Project Handoff
 
 ## 1. Project Overview
 
@@ -74,10 +74,9 @@ Admin account agreed in design:
   - `$2a$10$ul9WaxC8WF.7P0vzj0og5uswfqT1foa7ZjPi1lh/F7LCaMTKszx92`
 
 Important:
-- The conversation designed `sql/init-rbac.sql`
-- Current repository scan only clearly shows `sql/e-food.sql`
-- In the next chat, first verify whether `sql/init-rbac.sql` already exists on disk
-- If not, recreate it from the designed content before moving on
+- `sql/init-rbac.sql` now exists on disk
+- later chats should read and reuse this file instead of redesigning it from scratch
+- only recreate it if it is missing or clearly corrupted
 
 ### 2.4 System Management APIs Already Built
 #### User module
@@ -143,7 +142,7 @@ Notable files:
 
 ## 4. Important Current Technical State
 
-### 4.1 User list pagination has started and appears to be implemented
+### 4.1 User list pagination is implemented
 Observed in code:
 - `common/page/PageQuery.java`
 - `common/page/PageResult.java`
@@ -152,16 +151,35 @@ Observed in code:
 - `SysUserServiceImpl.listUsers(...)` uses MyBatis-Plus `Page<SysUser>`
 - `MybatisPlusConfig` already contains `PaginationInnerInterceptor`
 
-So user pagination is no longer "planned"; it is already present in code.
+So user pagination is no longer planned work; it is already implemented and being used as the reference pattern for other list modules.
 
-### 4.2 Role and permission list pagination are still not generalized
-Current role and permission list services still return plain `List<...>`.
-Natural next refactor is:
-- copy the same pagination pattern from user list
-- apply it to role list
-- apply it to permission list
+### 4.2 Role and permission list pagination are now implemented
+Current confirmed state in code:
+- `RoleListQuery extends PageQuery`
+- `PermissionListQuery extends PageQuery`
+- `SysRoleService.listRoles(...)` returns `PageResult<RoleListResponse>`
+- `SysPermissionService.listPermissions(...)` returns `PageResult<PermissionListResponse>`
+- role / permission controllers now return paged list results instead of plain `List<...>`
 
-### 4.3 Redis is intentionally deferred
+So the original pagination follow-up has already been completed.
+
+### 4.3 Management-module consistency polish has started and partly landed
+Confirmed improvements already applied in code:
+- `listUsers(...)`, `listRoles(...)`, `listPermissions(...)` now all guard `query == null` and fall back to default paging query objects
+- user status validation was aligned across create / update / update-status flows
+- role status validation was aligned across create / update / update-status flows
+- permission status validation was aligned across create / update / update-status flows
+- permission type validation was aligned across create / update flows
+- duplicated validation logic in service layer has begun to be extracted into private helper methods
+- helper methods now include patterns such as:
+  - `validateUserStatus(...)`
+  - `validateRoleStatus(...)`
+  - `validatePermissionStatus(...)`
+  - `validatePermissionType(...)`
+
+This means the project has already entered Phase 2 "management polish", not just Phase 1 pagination.
+
+### 4.4 Redis is intentionally deferred
 Important project decision from the conversation:
 - Redis should be integrated later
 - Do not rush Redis into the current stage
@@ -228,6 +246,12 @@ Repeatedly reinforced during development:
 - Service layer should aggregate entity, role, permission logic
 - DTOs should not be replaced by direct entity returns
 
+### 6.4 Detail permissions are intentionally still reused for now
+Current explicit decision from the follow-up conversation:
+- detail endpoints continue reusing list permissions for the current stage
+- do not split `system:user:detail`, `system:role:detail`, `system:permission:detail` yet
+- if frontend later needs finer-grained control, detail permissions can be introduced in a later refactor
+
 ## 7. Current Inconsistencies / Things To Clean Up Later
 
 ### 7.1 Some source comments are garbled
@@ -250,39 +274,49 @@ Recommended later refactor:
 - centralize these in `ResultCode` or a dedicated business error enum set
 
 ### 7.3 Some list/detail permissions are reused
-For simplicity, some detail endpoints currently reuse list permissions, for example:
-- user detail may reuse `system:user:list`
-- role detail may reuse `system:role:list`
-- permission detail may reuse `system:permission:list`
+For simplicity, detail endpoints currently still reuse list permissions, for example:
+- `GET /system/user/{id}` uses `system:user:list`
+- `GET /system/role/{id}` uses `system:role:list`
+- `GET /system/permission/{id}` uses `system:permission:list`
 
-This is acceptable for now, but later you may want finer permissions such as:
-- `system:user:detail`
-- `system:role:detail`
-- `system:permission:detail`
+This is intentional at the current stage.
+Do not change this casually in the next chat.
+Only split into separate detail permissions later if the frontend actually needs finer-grained control.
+
+### 7.4 Swagger / OpenAPI was added after the original handoff draft
+Current confirmed state from the follow-up conversation:
+- Swagger dependency has been added via `springdoc-openapi-starter-webmvc-ui`
+- Spring Security has been configured to permit:
+  - `/v3/api-docs/**`
+  - `/swagger-ui/**`
+  - `/swagger-ui.html`
+- OpenAPI basic config has been added in `src/main/java/com/epass/food/config/OpenApiConfig.java`
+- Swagger entry path is `/swagger-ui.html`
+- `/v3/api-docs` and Swagger UI were both manually verified to open successfully
+
+This means API documentation is now usable and should be used to help verify later modules.
+Do not spend the next chat re-adding Swagger unless the code on disk has clearly lost those changes.
 
 ## 8. What Should Be Done Next
 
 Recommended next priority order:
 
-### Phase 1: Finish pagination consistency
-1. paginate role list
-2. paginate permission list
-3. optionally standardize pagination DTO usage across list modules
+### Phase 1: Current foundation status
+Already completed in code:
+1. user list pagination
+2. role list pagination
+3. permission list pagination
+4. Swagger / OpenAPI basic access
+5. a first round of management-endpoint consistency fixes
 
-### Phase 2: Finish remaining system-management polish
-1. audit all existing management endpoints
-2. add any missing validation consistency
-3. optionally add detail permissions instead of reusing list permissions
-4. optionally centralize business error codes
+### Phase 2: Continue remaining system-management polish
+Recommended remaining polish items:
+1. audit whether there are still any missing validation consistency gaps
+2. optionally centralize handwritten business error codes into enum / constants
+3. keep detail endpoints reusing list permissions for now
+4. only introduce separate detail permissions later if frontend needs them
 
-### Phase 3: Consider missing management features
-Possible next endpoints/refactors:
-- user/role/permission list paging cleanup
-- optional "role tree" / permission tree output if frontend needs it
-- optional "list all roles" lightweight API for user edit pages
-- optional "list all permissions" lightweight API for role edit pages
-
-### Phase 4: Start first real business module
+### Phase 3: Start first real business module
 Recommended first business module:
 - `food_category`
 
@@ -290,17 +324,32 @@ Reason:
 - simple structure
 - good CRUD training target
 - foundation for `food_item`
+- now easier to build and verify because Swagger is available
+
+Recommended first tasks inside `food_category`:
+1. confirm final table fields to use from existing SQL design
+2. design CRUD endpoint list and DTOs
+3. define status / name uniqueness / delete rules
+4. then implement backend step by step
 
 ## 9. Suggested Immediate Next Task In New Chat
 
 If opening a new conversation, ask the new assistant to do this first:
 
 1. Read this handoff document
-2. Verify whether `sql/init-rbac.sql` exists on disk
-3. Verify current user-list pagination endpoint actually runs correctly
-4. Continue with role-list pagination and permission-list pagination
+2. Confirm current Swagger is already working instead of re-adding it
+3. Keep current rule that detail endpoints still reuse list permissions
+4. Do not restart old pagination work; it is already complete
+5. Continue with `food_category` module design first:
+   - fields
+   - DTOs
+   - endpoint list
+   - business rules
+6. Then implement `food_category` step by step
+7. Use Swagger to verify each new endpoint as it is added
+8. Continue using teaching style step by step, not all-at-once takeover
 
-That is the most natural continuation point based on current code state.
+That is now the most natural continuation point based on the latest code state.
 
 ## 10. API Capability Summary
 
@@ -347,13 +396,22 @@ When continuing from this project, please keep these constraints in mind:
   - roleCode
   - permCode
 - preserve current built-in protection rules around `admin`, `ADMIN`, and `admin:dashboard`
-- continue using detailed teaching style if the user asks step-by-step guidance
+- detail endpoints still intentionally reuse list permissions for now; this is a deliberate temporary decision, not an immediate bug to "fix"
+- Swagger is already working; do not spend the next chat re-adding it unless the code on disk no longer contains it
+- the user prefers step-by-step teaching collaboration
+- do not immediately take over and mass-edit files unless explicitly requested
+- prefer checking current code state first, then guiding one small change at a time
 
 ## 12. Short Summary
 
 Current state:
 - RBAC foundation is already usable
 - system management modules are mostly built
-- user list pagination has already started/landed in code
-- role/permission list pagination is the clearest next technical step
-- business modules have not started yet and should wait until system-management groundwork is stable
+- user / role / permission list pagination are all now implemented
+- a round of management consistency fixes has already been applied
+- Swagger / OpenAPI has been added and manually verified to work
+- detail endpoints still intentionally reuse list permissions for now
+- the clearest next module is now `food_category`
+- business modules have not really started yet beyond SQL design
+
+
