@@ -15,11 +15,11 @@ import org.springframework.security.web.authentication.UsernamePasswordAuthentic
  * Spring Security 配置类
  * 配置 Spring Security 的过滤器链，并定义请求的访问权限
  * 创建 SecurityFilterChain Bean，用于配置 Spring Security 的过滤器链
- *
- * @Configuration 标记当前类为配置类
- * @EnableWebSecurity 启用 Spring Security 的 Web 安全配置
- * @EnableConfigurationProperties(JwtProperties.class) 启用 JwtProperties 类的属性配置
- * @EnableMethodSecurity 启用 Spring Security 的方法级权限控制
+ * <p>
+ * Configuration 标记当前类为配置类
+ * EnableWebSecurity 启用 Spring Security 的 Web 安全配置
+ * EnableConfigurationProperties(JwtProperties.class)  启用 JwtProperties 类的属性配置
+ * EnableMethodSecurity 启用 Spring Security 的方法级权限控制
  */
 @Configuration
 @EnableWebSecurity
@@ -49,7 +49,13 @@ public class SecurityConfig {
                         .accessDeniedHandler(accessDeniedHandler)
                 )
                 .authorizeHttpRequests(auth -> auth
-                        .requestMatchers("/test/**", "/auth/login").permitAll()
+                        .requestMatchers(
+                                "/test/**",
+                                "/auth/login",
+                                "/v3/api-docs/**",
+                                "/swagger-ui/**",
+                                "/swagger-ui.html"
+                        ).permitAll()
                         .anyRequest().authenticated()
                 )
                 .formLogin(AbstractHttpConfigurer::disable)
