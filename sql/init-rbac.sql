@@ -190,9 +190,9 @@ VALUES ('admin',
         1,
         0)
 ON DUPLICATE KEY UPDATE password_hash = VALUES(password_hash),
-    nickname      = VALUES(nickname),
-                       phone         = VALUES(phone),
-                       status        = VALUES(status);
+                        nickname      = VALUES(nickname),
+                        phone         = VALUES(phone),
+                        status        = VALUES(status);
 
 # 在 sys_role 表里初始化一个管理员角色
 INSERT INTO sys_role (role_code,
@@ -202,7 +202,7 @@ VALUES ('ADMIN',
         '系统管理员',
         1)
 ON DUPLICATE KEY UPDATE role_name = VALUES(role_name),
-    status    = VALUES(status);
+                        status    = VALUES(status);
 
 # 管理首页权限
 INSERT INTO sys_permission (parent_id,
@@ -222,10 +222,10 @@ VALUES (0,
         1,
         1)
 ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
-    path      = VALUES(path),
-                       method    = VALUES(method),
-                       sort_no   = VALUES(sort_no),
-                       status    = VALUES(status);
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
 
 # 用户管理权限
 INSERT INTO sys_permission (parent_id,
@@ -242,10 +242,10 @@ VALUES (0, 'system:user:list', '用户列表查询', 3, '/system/user/list', 'GE
        (0, 'system:user:delete', '删除用户', 3, '/system/user/{id}', 'DELETE', 13, 1),
        (0, 'system:user:assign-role', '用户分配角色', 3, '/system/user/assign-role', 'POST', 14, 1)
 ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
-    path      = VALUES(path),
-                       method    = VALUES(method),
-                       sort_no   = VALUES(sort_no),
-                       status    = VALUES(status);
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
 
 # 角色管理权限
 INSERT INTO sys_permission (parent_id,
@@ -262,10 +262,10 @@ VALUES (0, 'system:role:list', '角色列表查询', 3, '/system/role/list', 'GE
        (0, 'system:role:delete', '删除角色', 3, '/system/role/{id}', 'DELETE', 23, 1),
        (0, 'system:role:assign-permission', '角色分配权限', 3, '/system/role/assign-permission', 'POST', 24, 1)
 ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
-    path      = VALUES(path),
-                       method    = VALUES(method),
-                       sort_no   = VALUES(sort_no),
-                       status    = VALUES(status);
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
 
 # 权限管理权限
 INSERT INTO sys_permission (parent_id,
@@ -281,10 +281,10 @@ VALUES (0, 'system:permission:list', '权限列表查询', 3, '/system/permissio
        (0, 'system:permission:update', '修改权限', 3, '/system/permission', 'PUT', 32, 1),
        (0, 'system:permission:delete', '删除权限', 3, '/system/permission/{id}', 'DELETE', 33, 1)
 ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
-    path      = VALUES(path),
-                       method    = VALUES(method),
-                       sort_no   = VALUES(sort_no),
-                       status    = VALUES(status);
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
 
 # 初始化用户角色关联 SQL
 INSERT INTO sys_user_role (user_id,
@@ -321,6 +321,71 @@ FROM sys_role r
                                                   'system:permission:add',
                                                   'system:permission:update',
                                                   'system:permission:delete'
+    )
+WHERE r.role_code = 'ADMIN'
+  AND NOT EXISTS (SELECT 1
+                  FROM sys_role_permission rp
+                  WHERE rp.role_id = r.id
+                    AND rp.permission_id = p.id);
+
+-- food_category 模块权限
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+VALUES (0,
+        'food:category',
+        '分类管理',
+        1,
+        '/food/category',
+        NULL,
+        2000,
+        1)
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+VALUES (0, 'food:category:list', '分类列表', 3, '/food/category/list', 'GET', 2001, 1),
+       (0, 'food:category:detail', '分类详情', 3, '/food/category/{id}', 'GET', 2002, 1),
+       (0, 'food:category:add', '新增分类', 3, '/food/category', 'POST', 2003, 1),
+       (0, 'food:category:update', '修改分类', 3, '/food/category', 'PUT', 2004, 1),
+       (0, 'food:category:update-status', '修改分类状态', 3, '/food/category/status', 'PUT', 2005, 1),
+       (0, 'food:category:delete', '删除分类', 3, '/food/category/{id}', 'DELETE', 2006, 1)
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_role_permission (role_id,
+                                 permission_id)
+SELECT r.id,
+       p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.perm_code IN (
+                                                  'food:category',
+                                                  'food:category:list',
+                                                  'food:category:detail',
+                                                  'food:category:add',
+                                                  'food:category:update',
+                                                  'food:category:update-status',
+                                                  'food:category:delete'
     )
 WHERE r.role_code = 'ADMIN'
   AND NOT EXISTS (SELECT 1

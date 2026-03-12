@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:5603
-@adminToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyOTc1NDU3LCJleHAiOjE3NzI5ODI2NTd9.o9jkYXDTVztMZc7PK03IiOkRxNGbikXL7ugi2N7XaS9lcLgMw9jye_ICCLr_IUPY4ZVfbbJqhbP4pywJ0Pw6Dg
-@userToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIyIiwidXNlcm5hbWUiOiJ1c2VyMSIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzcyOTc1NDE5LCJleHAiOjE3NzI5ODI2MTl9.M6s160yW9BbFU9-NfYlpYuIfUuLnj23xHp7IGCY0p5NEmZ_whjnqPiF7L19WPbZ1WbGmv00-zwSOtw20c-P5OA
+@adminToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzczMzIxNTUxLCJleHAiOjE3NzMzMjg3NTF9.DkQBdMzA6JDJOF8RKHYlB3h8t4yEuoXtHp95ztgBiwzbKBB3zRkHBuTSuzxA1cB5PzB5h6hz5xzL0m0TNfhoKQ
+@userToken =
 # 测试账号密码
 # 管理员： admin Admin@123
 # 普通用户： user1 User@123
@@ -212,3 +212,47 @@ Authorization: Bearer {{adminToken}}
 GET {{baseUrl}}/system/user/list?pageNum=1&pageSize=1
 Authorization: Bearer {{adminToken}}
 
+### 食物分类列表
+GET {{baseUrl}}/food/category/list
+Authorization: Bearer {{adminToken}}
+
+### 食物分类新增分类
+POST {{baseUrl}}/food/category
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "name": "热菜",
+  "sortNo": 2,
+  "status": 1
+}
+
+### 食物分类详情
+GET {{baseUrl}}/food/category/1
+Authorization: Bearer {{adminToken}}
+
+### 食物分类修改分类
+PUT {{baseUrl}}/food/category
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "id": 1,
+  "name": "招牌热菜",
+  "sortNo": 10,
+  "status": 1
+}
+
+### 食物分类单独修改状态
+PUT {{baseUrl}}/food/category/status
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "categoryId": 1,
+  "status": 1
+}
+
+### 食物分类删除
+DELETE {{baseUrl}}/food/category/1
+Authorization: Bearer {{adminToken}}
