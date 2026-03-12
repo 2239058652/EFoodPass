@@ -111,6 +111,7 @@ public class FoodCategoryServiceImpl extends ServiceImpl<FoodCategoryMapper, Foo
         }
 
         if (query.getStatus() != null) {
+            validateCategoryStatus(query.getStatus());
             queryWrapper.eq(FoodCategory::getStatus, query.getStatus());
         }
 

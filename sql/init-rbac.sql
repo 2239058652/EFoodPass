@@ -328,7 +328,7 @@ WHERE r.role_code = 'ADMIN'
                   WHERE rp.role_id = r.id
                     AND rp.permission_id = p.id);
 
--- food_category 模块权限
+-- food_category 模块父权限
 INSERT INTO sys_permission (parent_id,
                             perm_code,
                             perm_name,
@@ -352,6 +352,7 @@ ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
                         sort_no   = VALUES(sort_no),
                         status    = VALUES(status);
 
+-- food_category 模块子权限
 INSERT INTO sys_permission (parent_id,
                             perm_code,
                             perm_name,
@@ -360,13 +361,148 @@ INSERT INTO sys_permission (parent_id,
                             method,
                             sort_no,
                             status)
-VALUES (0, 'food:category:list', '分类列表', 3, '/food/category/list', 'GET', 2001, 1),
-       (0, 'food:category:detail', '分类详情', 3, '/food/category/{id}', 'GET', 2002, 1),
-       (0, 'food:category:add', '新增分类', 3, '/food/category', 'POST', 2003, 1),
-       (0, 'food:category:update', '修改分类', 3, '/food/category', 'PUT', 2004, 1),
-       (0, 'food:category:update-status', '修改分类状态', 3, '/food/category/status', 'PUT', 2005, 1),
-       (0, 'food:category:delete', '删除分类', 3, '/food/category/{id}', 'DELETE', 2006, 1)
+SELECT p.id,
+       'food:category:list',
+       '分类列表',
+       3,
+       '/food/category/list',
+       'GET',
+       2001,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:category'
 ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:category:detail',
+       '分类详情',
+       3,
+       '/food/category/{id}',
+       'GET',
+       2002,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:category'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:category:add',
+       '新增分类',
+       3,
+       '/food/category',
+       'POST',
+       2003,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:category'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:category:update',
+       '修改分类',
+       3,
+       '/food/category',
+       'PUT',
+       2004,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:category'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:category:update-status',
+       '修改分类状态',
+       3,
+       '/food/category/status',
+       'PUT',
+       2005,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:category'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:category:delete',
+       '删除分类',
+       3,
+       '/food/category/{id}',
+       'DELETE',
+       2006,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:category'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
                         perm_type = VALUES(perm_type),
                         path      = VALUES(path),
                         method    = VALUES(method),
@@ -386,6 +522,207 @@ FROM sys_role r
                                                   'food:category:update',
                                                   'food:category:update-status',
                                                   'food:category:delete'
+    )
+WHERE r.role_code = 'ADMIN'
+  AND NOT EXISTS (SELECT 1
+                  FROM sys_role_permission rp
+                  WHERE rp.role_id = r.id
+                    AND rp.permission_id = p.id);
+
+-- food_item 模块父权限
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+VALUES (0,
+        'food:item',
+        '菜品管理',
+        1,
+        '/food/item',
+        NULL,
+        2100,
+        1)
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+-- food_item 模块子权限
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:item:list',
+       '菜品列表',
+       3,
+       '/food/item/list',
+       'GET',
+       2101,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:item'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:item:detail',
+       '菜品详情',
+       3,
+       '/food/item/{id}',
+       'GET',
+       2102,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:item'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:item:add',
+       '新增菜品',
+       3,
+       '/food/item',
+       'POST',
+       2103,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:item'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:item:update',
+       '修改菜品',
+       3,
+       '/food/item',
+       'PUT',
+       2104,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:item'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:item:update-on-sale',
+       '修改上下架状态',
+       3,
+       '/food/item/on-sale',
+       'PUT',
+       2105,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:item'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id,
+                            perm_code,
+                            perm_name,
+                            perm_type,
+                            path,
+                            method,
+                            sort_no,
+                            status)
+SELECT p.id,
+       'food:item:delete',
+       '删除菜品',
+       3,
+       '/food/item/{id}',
+       'DELETE',
+       2106,
+       1
+FROM sys_permission p
+WHERE p.perm_code = 'food:item'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_role_permission (role_id,
+                                 permission_id)
+SELECT r.id,
+       p.id
+FROM sys_role r
+         JOIN sys_permission p ON p.perm_code IN (
+                                                  'food:item',
+                                                  'food:item:list',
+                                                  'food:item:detail',
+                                                  'food:item:add',
+                                                  'food:item:update',
+                                                  'food:item:update-on-sale',
+                                                  'food:item:delete'
     )
 WHERE r.role_code = 'ADMIN'
   AND NOT EXISTS (SELECT 1
