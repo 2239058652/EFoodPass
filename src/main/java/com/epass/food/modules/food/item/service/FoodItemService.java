@@ -17,5 +17,7 @@ public interface FoodItemService extends IService<FoodItem> {
 
     void updateOnSaleStatus(FoodItemUpdateOnSaleRequest request);
 
+    void adjustStock(FoodItemAdjustStockRequest request);
+
     void deleteItem(Long itemId);
 }

@@ -51,6 +51,13 @@ public class FoodItemController {
         return Result.success();
     }
 
+    @PreAuthorize("hasAuthority('food:item:update-stock')")
+    @PutMapping("/stock")
+    public Result<Void> adjustStock(@Valid @RequestBody FoodItemAdjustStockRequest request) {
+        foodItemService.adjustStock(request);
+        return Result.success();
+    }
+
     @PreAuthorize("hasAuthority('food:item:delete')")
     @DeleteMapping("/{id}")
     public Result<Void> delete(@PathVariable Long id) {

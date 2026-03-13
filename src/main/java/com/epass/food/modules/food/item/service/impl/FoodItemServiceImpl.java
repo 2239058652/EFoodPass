@@ -13,6 +13,7 @@ import com.epass.food.modules.food.item.mapper.FoodItemMapper;
 import com.epass.food.modules.food.item.service.FoodItemService;
 import com.epass.food.modules.food.order.entity.FoodOrderItem;
 import com.epass.food.modules.food.order.mapper.FoodOrderItemMapper;
+import com.epass.food.modules.food.stock.service.FoodStockLogService;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -27,11 +28,14 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
 
     private final FoodCategoryMapper foodCategoryMapper;
     private final FoodOrderItemMapper foodOrderItemMapper;
+    private final FoodStockLogService foodStockLogService;
 
     public FoodItemServiceImpl(FoodCategoryMapper foodCategoryMapper,
-                               FoodOrderItemMapper foodOrderItemMapper) {
+                               FoodOrderItemMapper foodOrderItemMapper,
+                               FoodStockLogService foodStockLogService) {
         this.foodCategoryMapper = foodCategoryMapper;
         this.foodOrderItemMapper = foodOrderItemMapper;
+        this.foodStockLogService = foodStockLogService;
     }
 
     private void validateOnSaleStatus(Integer isOnSale) {
@@ -249,6 +253,25 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
 
         item.setIsOnSale(request.getIsOnSale());
         this.updateById(item);
+    }
+
+    @Override
+    public void adjustStock(FoodItemAdjustStockRequest request) {
+        FoodItem item = getRequiredItem(request.getItemId());
+        validateStock(request.getStock());
+
+        int beforeStock = item.getStock() == null ? 0 : item.getStock();
+        int afterStock = request.getStock();
+
+        item.setStock(afterStock);
+        this.updateById(item);
+
+        foodStockLogService.recordManualAdjust(
+                item.getId(),
+                beforeStock,
+                afterStock,
+                StringUtils.hasText(request.getRemark()) ? request.getRemark().trim() : "后台手工调整库存"
+        );
     }
 
     @Override

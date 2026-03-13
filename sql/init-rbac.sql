@@ -722,6 +722,7 @@ FROM sys_role r
                                                   'food:item:add',
                                                   'food:item:update',
                                                   'food:item:update-on-sale',
+                                                  'food:item:update-stock',
                                                   'food:item:delete'
     )
 WHERE r.role_code = 'ADMIN'
@@ -956,3 +957,22 @@ ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
                         method    = VALUES(method),
                         sort_no   = VALUES(sort_no),
                         status    = VALUES(status);
+
+CREATE TABLE food_stock_log
+(
+    id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    food_item_id  BIGINT UNSIGNED NOT NULL COMMENT '菜品ID',
+    change_type   TINYINT         NOT NULL COMMENT '变动类型：1下单扣减 2取消回补 3后台调整',
+    change_amount INT             NOT NULL COMMENT '变动数量，扣减为负数，回补为正数',
+    before_stock  INT             NOT NULL COMMENT '变动前库存',
+    after_stock   INT             NOT NULL COMMENT '变动后库存',
+    biz_id        BIGINT UNSIGNED          DEFAULT NULL COMMENT '业务ID，例如订单ID',
+    remark        VARCHAR(255)             DEFAULT NULL COMMENT '备注',
+    created_at    DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_food_stock_log_food_item_id (food_item_id),
+    KEY idx_food_stock_log_change_type (change_type),
+    KEY idx_food_stock_log_biz_id (biz_id),
+    CONSTRAINT fk_food_stock_log_food_item_id FOREIGN KEY (food_item_id) REFERENCES food_item (id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='库存变动日志表';
