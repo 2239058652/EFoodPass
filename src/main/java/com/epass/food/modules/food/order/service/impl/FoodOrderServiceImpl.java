@@ -25,7 +25,9 @@ import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -72,6 +74,9 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) {
             throw new BusinessException(4303, "下单用户不存在");
+        }
+        if (!Integer.valueOf(1).equals(user.getStatus())) {
+            throw new BusinessException(4312, "下单用户已被禁用");
         }
         return user;
     }
@@ -176,11 +181,20 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
             throw new BusinessException(4304, "订单明细不能为空");
         }
 
+        Map<Long, Integer> itemQuantityMap = new HashMap<>();
+        for (FoodOrderItemRequest itemRequest : request.getItems()) {
+            itemQuantityMap.merge(itemRequest.getFoodItemId(), itemRequest.getQuantity(), Integer::sum);
+        }
+
         BigDecimal totalAmount = BigDecimal.ZERO;
         List<FoodOrderItem> orderItems = new ArrayList<>();
+        List<FoodItem> itemsToUpdate = new ArrayList<>();
 
-        for (FoodOrderItemRequest itemRequest : request.getItems()) {
-            FoodItem item = foodItemMapper.selectById(itemRequest.getFoodItemId());
+        for (Map.Entry<Long, Integer> entry : itemQuantityMap.entrySet()) {
+            Long foodItemId = entry.getKey();
+            Integer totalQuantity = entry.getValue();
+
+            FoodItem item = foodItemMapper.selectById(foodItemId);
             if (item == null) {
                 throw new BusinessException(4305, "菜品不存在");
             }
@@ -193,6 +207,17 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
             if (category == null || !Integer.valueOf(1).equals(category.getStatus())) {
                 throw new BusinessException(4307, "存在所属分类不可用的菜品，不能下单");
             }
+
+            if (item.getStock() == null || item.getStock() < totalQuantity) {
+                throw new BusinessException(4313, "菜品库存不足，不能下单");
+            }
+
+            item.setStock(item.getStock() - totalQuantity);
+            itemsToUpdate.add(item);
+        }
+
+        for (FoodOrderItemRequest itemRequest : request.getItems()) {
+            FoodItem item = foodItemMapper.selectById(itemRequest.getFoodItemId());
 
             BigDecimal itemAmount = item.getPrice().multiply(BigDecimal.valueOf(itemRequest.getQuantity()));
             totalAmount = totalAmount.add(itemAmount);
@@ -219,6 +244,10 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
             orderItem.setOrderId(order.getId());
             foodOrderItemMapper.insert(orderItem);
         }
+
+        for (FoodItem item : itemsToUpdate) {
+            foodItemMapper.updateById(item);
+        }
     }
 
     @Override
@@ -234,6 +263,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     }
 
     @Override
+    @Transactional(rollbackFor = Exception.class)
     public void cancelOrder(FoodOrderUpdateStatusRequest request) {
         FoodOrder order = getRequiredOrder(request.getOrderId());
 
@@ -243,6 +273,22 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
 
         if (Integer.valueOf(ORDER_STATUS_CANCELED).equals(order.getOrderStatus())) {
             throw new BusinessException(4309, "订单已取消，请勿重复操作");
+        }
+
+        List<FoodOrderItem> orderItemList = foodOrderItemMapper.selectList(
+                new LambdaQueryWrapper<FoodOrderItem>()
+                        .eq(FoodOrderItem::getOrderId, request.getOrderId())
+        );
+
+        for (FoodOrderItem orderItem : orderItemList) {
+            FoodItem item = foodItemMapper.selectById(orderItem.getFoodItemId());
+            if (item == null) {
+                throw new BusinessException(4314, "订单关联菜品不存在，无法回补库存");
+            }
+
+            int oldStock = item.getStock() == null ? 0 : item.getStock();
+            item.setStock(oldStock + orderItem.getQuantity());
+            foodItemMapper.updateById(item);
         }
 
         order.setOrderStatus(ORDER_STATUS_CANCELED);
