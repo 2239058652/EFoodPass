@@ -15,6 +15,7 @@ import com.epass.food.modules.food.order.entity.FoodOrderItem;
 import com.epass.food.modules.food.order.mapper.FoodOrderItemMapper;
 import com.epass.food.modules.food.order.mapper.FoodOrderMapper;
 import com.epass.food.modules.food.order.service.FoodOrderService;
+import com.epass.food.modules.food.stock.service.FoodStockLogService;
 import com.epass.food.modules.system.user.entity.SysUser;
 import com.epass.food.modules.system.user.mapper.SysUserMapper;
 import org.springframework.stereotype.Service;
@@ -40,14 +41,18 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     private final FoodCategoryMapper foodCategoryMapper;
     private final SysUserMapper sysUserMapper;
 
+    private final FoodStockLogService foodStockLogService;
+
     public FoodOrderServiceImpl(FoodOrderItemMapper foodOrderItemMapper,
                                 FoodItemMapper foodItemMapper,
                                 FoodCategoryMapper foodCategoryMapper,
-                                SysUserMapper sysUserMapper) {
+                                SysUserMapper sysUserMapper,
+                                FoodStockLogService foodStockLogService) {
         this.foodOrderItemMapper = foodOrderItemMapper;
         this.foodItemMapper = foodItemMapper;
         this.foodCategoryMapper = foodCategoryMapper;
         this.sysUserMapper = sysUserMapper;
+        this.foodStockLogService = foodStockLogService;
     }
 
     private void validateOrderStatus(Integer orderStatus) {
@@ -217,7 +222,8 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
                 throw new BusinessException(4313, "菜品库存不足，不能下单");
             }
 
-            item.setStock(item.getStock() - totalQuantity);
+            int beforeStock = item.getStock();
+            item.setStock(beforeStock - totalQuantity);
             itemsToUpdate.add(item);
         }
 
@@ -251,7 +257,15 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         }
 
         for (FoodItem item : itemsToUpdate) {
+            int afterStock = item.getStock();
+            int beforeStock = afterStock + itemQuantityMap.get(item.getId());
             foodItemMapper.updateById(item);
+            foodStockLogService.recordOrderDeduct(
+                    item.getId(),
+                    beforeStock,
+                    itemQuantityMap.get(item.getId()),
+                    order.getId()
+            );
         }
     }
 
@@ -291,9 +305,15 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
                 throw new BusinessException(4314, "订单关联菜品不存在，无法回补库存");
             }
 
-            int oldStock = item.getStock() == null ? 0 : item.getStock();
-            item.setStock(oldStock + orderItem.getQuantity());
+            int beforeStock = item.getStock() == null ? 0 : item.getStock();
+            item.setStock(beforeStock + orderItem.getQuantity());
             foodItemMapper.updateById(item);
+            foodStockLogService.recordOrderRestore(
+                    item.getId(),
+                    beforeStock,
+                    orderItem.getQuantity(),
+                    order.getId()
+            );
         }
 
         order.setOrderStatus(ORDER_STATUS_CANCELED);
