@@ -99,6 +99,14 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         return response;
     }
 
+    private FoodOrder getRequiredUserOwnedOrder(Long userId, Long orderId) {
+        FoodOrder order = getRequiredOrder(orderId);
+        if (!order.getUserId().equals(userId)) {
+            throw new BusinessException(4315, "无权操作该订单");
+        }
+        return order;
+    }
+
     @Override
     public PageResult<FoodOrderListResponse> listOrders(FoodOrderListQuery query) {
         if (query == null) {
@@ -305,5 +313,41 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
 
         order.setOrderStatus(ORDER_STATUS_COMPLETED);
         this.updateById(order);
+    }
+
+    @Override
+    public PageResult<FoodOrderListResponse> listCurrentUserOrders(Long userId, FoodOrderListQuery query) {
+        if (query == null) {
+            query = new FoodOrderListQuery();
+        }
+
+        query.setUserId(userId);
+        return listOrders(query);
+    }
+
+    @Override
+    public FoodOrderDetailResponse getCurrentUserOrderDetail(Long userId, Long orderId) {
+        getRequiredUserOwnedOrder(userId, orderId);
+        return getOrderDetail(orderId);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void createCurrentUserOrder(Long userId, AppOrderCreateRequest request) {
+        FoodOrderCreateRequest createRequest = new FoodOrderCreateRequest();
+        createRequest.setUserId(userId);
+        createRequest.setRemark(request.getRemark());
+        createRequest.setItems(request.getItems());
+        createOrder(createRequest);
+    }
+
+    @Override
+    @Transactional(rollbackFor = Exception.class)
+    public void cancelCurrentUserOrder(Long userId, Long orderId) {
+        getRequiredUserOwnedOrder(userId, orderId);
+
+        FoodOrderUpdateStatusRequest request = new FoodOrderUpdateStatusRequest();
+        request.setOrderId(orderId);
+        cancelOrder(request);
     }
 }

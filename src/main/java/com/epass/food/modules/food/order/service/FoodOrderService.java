@@ -18,4 +18,12 @@ public interface FoodOrderService extends IService<FoodOrder> {
     void cancelOrder(FoodOrderUpdateStatusRequest request);
 
     void completeOrder(FoodOrderUpdateStatusRequest request);
+
+    PageResult<FoodOrderListResponse> listCurrentUserOrders(Long userId, FoodOrderListQuery query);
+
+    FoodOrderDetailResponse getCurrentUserOrderDetail(Long userId, Long orderId);
+
+    void createCurrentUserOrder(Long userId, AppOrderCreateRequest request);
+
+    void cancelCurrentUserOrder(Long userId, Long orderId);
 }
