@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.epass.food.common.exception.BusinessException;
 import com.epass.food.common.page.PageResult;
+import com.epass.food.common.result.BizErrorCode;
 import com.epass.food.modules.food.category.entity.FoodCategory;
 import com.epass.food.modules.food.category.mapper.FoodCategoryMapper;
 import com.epass.food.modules.food.item.dto.*;
@@ -40,19 +41,19 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
 
     private void validateOnSaleStatus(Integer isOnSale) {
         if (!Integer.valueOf(0).equals(isOnSale) && !Integer.valueOf(1).equals(isOnSale)) {
-            throw new BusinessException(4201, "菜品上下架状态值不合法");
+            throw new BusinessException(BizErrorCode.ITEM_ON_SALE_STATUS_INVALID, "菜品上下架状态值不合法");
         }
     }
 
     private void validatePrice(BigDecimal price) {
         if (price == null || price.compareTo(BigDecimal.ZERO) < 0) {
-            throw new BusinessException(4202, "菜品价格不能小于0");
+            throw new BusinessException(BizErrorCode.ITEM_PRICE_INVALID, "菜品价格不能小于0");
         }
     }
 
     private void validateStock(Integer stock) {
         if (stock == null || stock < 0) {
-            throw new BusinessException(4203, "菜品库存不能小于0");
+            throw new BusinessException(BizErrorCode.ITEM_STOCK_INVALID, "菜品库存不能小于0");
         }
     }
 
@@ -63,7 +64,7 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
     private FoodCategory getRequiredCategory(Long categoryId) {
         FoodCategory category = foodCategoryMapper.selectById(categoryId);
         if (category == null) {
-            throw new BusinessException(4204, "分类不存在");
+            throw new BusinessException(BizErrorCode.ITEM_CATEGORY_NOT_FOUND, "分类不存在");
         }
         return category;
     }
@@ -71,7 +72,7 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
     private FoodCategory getRequiredEnabledCategory(Long categoryId) {
         FoodCategory category = getRequiredCategory(categoryId);
         if (!Integer.valueOf(1).equals(category.getStatus())) {
-            throw new BusinessException(4205, "分类已停用，不能操作菜品");
+            throw new BusinessException(BizErrorCode.ITEM_CATEGORY_DISABLED, "分类已停用，不能操作菜品");
         }
         return category;
     }
@@ -79,7 +80,7 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
     private FoodItem getRequiredItem(Long itemId) {
         FoodItem item = this.getById(itemId);
         if (item == null) {
-            throw new BusinessException(4206, "菜品不存在");
+            throw new BusinessException(BizErrorCode.ITEM_NOT_FOUND, "菜品不存在");
         }
         return item;
     }
@@ -97,7 +98,7 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
 
         FoodItem existItem = this.getOne(queryWrapper);
         if (existItem != null) {
-            throw new BusinessException(4207, "同一分类下菜品名称已存在");
+            throw new BusinessException(BizErrorCode.ITEM_NAME_EXISTS, "同一分类下菜品名称已存在");
         }
     }
 
@@ -196,7 +197,7 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
     public void createItem(FoodItemCreateRequest request) {
         String itemName = normalizeItemName(request.getName());
         if (!StringUtils.hasText(itemName)) {
-            throw new BusinessException(4208, "菜品名称不能为空");
+            throw new BusinessException(BizErrorCode.ITEM_NAME_BLANK, "菜品名称不能为空");
         }
 
         getRequiredEnabledCategory(request.getCategoryId());
@@ -222,7 +223,7 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
 
         String itemName = normalizeItemName(request.getName());
         if (!StringUtils.hasText(itemName)) {
-            throw new BusinessException(4208, "菜品名称不能为空");
+            throw new BusinessException(BizErrorCode.ITEM_NAME_BLANK, "菜品名称不能为空");
         }
 
         getRequiredEnabledCategory(request.getCategoryId());
@@ -248,7 +249,7 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
 
         FoodCategory category = getRequiredCategory(item.getCategoryId());
         if (Integer.valueOf(1).equals(request.getIsOnSale()) && !Integer.valueOf(1).equals(category.getStatus())) {
-            throw new BusinessException(4209, "所属分类已停用，不能上架菜品");
+            throw new BusinessException(BizErrorCode.ITEM_CATEGORY_DISABLED_FOR_ON_SALE, "所属分类已停用，不能上架菜品");
         }
 
         item.setIsOnSale(request.getIsOnSale());
@@ -283,7 +284,7 @@ public class FoodItemServiceImpl extends ServiceImpl<FoodItemMapper, FoodItem> i
                         .eq(FoodOrderItem::getFoodItemId, itemId)
         );
         if (orderItemCount != null && orderItemCount > 0) {
-            throw new BusinessException(4210, "当前菜品已有关联订单，不能删除");
+            throw new BusinessException(BizErrorCode.ITEM_HAS_ORDER_RELATION, "当前菜品已有关联订单，不能删除");
         }
 
         this.removeById(itemId);

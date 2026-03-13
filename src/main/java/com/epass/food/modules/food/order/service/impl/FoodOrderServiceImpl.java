@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.epass.food.common.exception.BusinessException;
 import com.epass.food.common.page.PageResult;
+import com.epass.food.common.result.BizErrorCode;
 import com.epass.food.modules.food.category.entity.FoodCategory;
 import com.epass.food.modules.food.category.mapper.FoodCategoryMapper;
 import com.epass.food.modules.food.item.entity.FoodItem;
@@ -60,14 +61,14 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
                 && !Integer.valueOf(ORDER_STATUS_PROCESSING).equals(orderStatus)
                 && !Integer.valueOf(ORDER_STATUS_COMPLETED).equals(orderStatus)
                 && !Integer.valueOf(ORDER_STATUS_CANCELED).equals(orderStatus)) {
-            throw new BusinessException(4301, "订单状态值不合法");
+            throw new BusinessException(BizErrorCode.ORDER_STATUS_INVALID, "订单状态值不合法");
         }
     }
 
     private FoodOrder getRequiredOrder(Long orderId) {
         FoodOrder order = this.getById(orderId);
         if (order == null) {
-            throw new BusinessException(4302, "订单不存在");
+            throw new BusinessException(BizErrorCode.ORDER_NOT_FOUND, "订单不存在");
         }
         return order;
     }
@@ -75,10 +76,10 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     private SysUser getRequiredUser(Long userId) {
         SysUser user = sysUserMapper.selectById(userId);
         if (user == null) {
-            throw new BusinessException(4303, "下单用户不存在");
+            throw new BusinessException(BizErrorCode.ORDER_USER_NOT_FOUND, "下单用户不存在");
         }
         if (!Integer.valueOf(1).equals(user.getStatus())) {
-            throw new BusinessException(4312, "下单用户已被禁用");
+            throw new BusinessException(BizErrorCode.ORDER_USER_DISABLED, "下单用户已被禁用");
         }
         return user;
     }
@@ -104,7 +105,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     private FoodOrder getRequiredUserOwnedOrder(Long userId, Long orderId) {
         FoodOrder order = getRequiredOrder(orderId);
         if (!order.getUserId().equals(userId)) {
-            throw new BusinessException(4315, "无权操作该订单");
+            throw new BusinessException(BizErrorCode.ORDER_NO_PERMISSION, "无权操作该订单");
         }
         return order;
     }
@@ -188,7 +189,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         getRequiredUser(request.getUserId());
 
         if (request.getItems() == null || request.getItems().isEmpty()) {
-            throw new BusinessException(4304, "订单明细不能为空");
+            throw new BusinessException(BizErrorCode.ORDER_ITEMS_EMPTY, "订单明细不能为空");
         }
 
         Map<Long, Integer> itemQuantityMap = new HashMap<>();
@@ -206,20 +207,20 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
 
             FoodItem item = foodItemMapper.selectById(foodItemId);
             if (item == null) {
-                throw new BusinessException(4305, "菜品不存在");
+                throw new BusinessException(BizErrorCode.ORDER_ITEM_NOT_FOUND, "菜品不存在");
             }
 
             if (!Integer.valueOf(1).equals(item.getIsOnSale())) {
-                throw new BusinessException(4306, "存在未上架菜品，不能下单");
+                throw new BusinessException(BizErrorCode.ORDER_ITEM_NOT_ON_SALE, "存在未上架菜品，不能下单");
             }
 
             FoodCategory category = foodCategoryMapper.selectById(item.getCategoryId());
             if (category == null || !Integer.valueOf(1).equals(category.getStatus())) {
-                throw new BusinessException(4307, "存在所属分类不可用的菜品，不能下单");
+                throw new BusinessException(BizErrorCode.ORDER_ITEM_CATEGORY_INVALID, "存在所属分类不可用的菜品，不能下单");
             }
 
             if (item.getStock() == null || item.getStock() < totalQuantity) {
-                throw new BusinessException(4313, "菜品库存不足，不能下单");
+                throw new BusinessException(BizErrorCode.ORDER_ITEM_STOCK_NOT_ENOUGH, "菜品库存不足，不能下单");
             }
 
             int beforeStock = item.getStock();
@@ -274,7 +275,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         FoodOrder order = getRequiredOrder(request.getOrderId());
 
         if (!Integer.valueOf(ORDER_STATUS_PENDING).equals(order.getOrderStatus())) {
-            throw new BusinessException(4311, "只有待确认订单才能开始制作");
+            throw new BusinessException(BizErrorCode.ORDER_ONLY_PENDING_CAN_PROCESS, "只有待确认订单才能开始制作");
         }
 
         order.setOrderStatus(ORDER_STATUS_PROCESSING);
@@ -287,11 +288,11 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         FoodOrder order = getRequiredOrder(request.getOrderId());
 
         if (Integer.valueOf(ORDER_STATUS_COMPLETED).equals(order.getOrderStatus())) {
-            throw new BusinessException(4308, "已完成订单不能取消");
+            throw new BusinessException(BizErrorCode.ORDER_COMPLETED_CANNOT_CANCEL, "已完成订单不能取消");
         }
 
         if (Integer.valueOf(ORDER_STATUS_CANCELED).equals(order.getOrderStatus())) {
-            throw new BusinessException(4309, "订单已取消，请勿重复操作");
+            throw new BusinessException(BizErrorCode.ORDER_ALREADY_CANCELED, "订单已取消，请勿重复操作");
         }
 
         List<FoodOrderItem> orderItemList = foodOrderItemMapper.selectList(
@@ -302,7 +303,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         for (FoodOrderItem orderItem : orderItemList) {
             FoodItem item = foodItemMapper.selectById(orderItem.getFoodItemId());
             if (item == null) {
-                throw new BusinessException(4314, "订单关联菜品不存在，无法回补库存");
+                throw new BusinessException(BizErrorCode.ORDER_RESTORE_ITEM_NOT_FOUND, "订单关联菜品不存在，无法回补库存");
             }
 
             int beforeStock = item.getStock() == null ? 0 : item.getStock();
@@ -325,7 +326,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         FoodOrder order = getRequiredOrder(request.getOrderId());
 
         if (!Integer.valueOf(ORDER_STATUS_PROCESSING).equals(order.getOrderStatus())) {
-            throw new BusinessException(4310, "只有制作中的订单才能完成");
+            throw new BusinessException(BizErrorCode.ORDER_ONLY_PROCESSING_CAN_COMPLETE, "只有制作中的订单才能完成");
         }
 
         order.setOrderStatus(ORDER_STATUS_COMPLETED);

@@ -4,6 +4,7 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.epass.food.common.exception.BusinessException;
 import com.epass.food.common.page.PageResult;
+import com.epass.food.common.result.BizErrorCode;
 import com.epass.food.modules.food.item.entity.FoodItem;
 import com.epass.food.modules.food.item.mapper.FoodItemMapper;
 import com.epass.food.modules.food.stock.dto.FoodStockLogListQuery;
@@ -36,7 +37,7 @@ public class FoodStockLogServiceImpl implements FoodStockLogService {
         if (!Integer.valueOf(CHANGE_TYPE_ORDER_DEDUCT).equals(changeType)
                 && !Integer.valueOf(CHANGE_TYPE_ORDER_RESTORE).equals(changeType)
                 && !Integer.valueOf(CHANGE_TYPE_MANUAL_ADJUST).equals(changeType)) {
-            throw new BusinessException(4401, "库存变动类型不合法");
+            throw new BusinessException(BizErrorCode.STOCK_LOG_CHANGE_TYPE_INVALID, "库存变动类型不合法");
         }
     }
 

@@ -5,6 +5,7 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.epass.food.common.exception.BusinessException;
 import com.epass.food.common.page.PageResult;
+import com.epass.food.common.result.BizErrorCode;
 import com.epass.food.modules.food.category.dto.*;
 import com.epass.food.modules.food.category.entity.FoodCategory;
 import com.epass.food.modules.food.category.mapper.FoodCategoryMapper;
@@ -33,7 +34,7 @@ public class FoodCategoryServiceImpl extends ServiceImpl<FoodCategoryMapper, Foo
      */
     private void validateCategoryStatus(Integer status) {
         if (!Integer.valueOf(0).equals(status) && !Integer.valueOf(1).equals(status)) {
-            throw new BusinessException(4101, "分类状态值不合法");
+            throw new BusinessException(BizErrorCode.CATEGORY_STATUS_INVALID, "分类状态值不合法");
         }
     }
 
@@ -65,7 +66,7 @@ public class FoodCategoryServiceImpl extends ServiceImpl<FoodCategoryMapper, Foo
 
         FoodCategory existCategory = this.getOne(queryWrapper);
         if (existCategory != null) {
-            throw new BusinessException(4102, "分类名称已存在");
+            throw new BusinessException(BizErrorCode.CATEGORY_NAME_EXISTS, "分类名称已存在");
         }
     }
 
@@ -78,7 +79,7 @@ public class FoodCategoryServiceImpl extends ServiceImpl<FoodCategoryMapper, Foo
     private FoodCategory getRequiredCategory(Long categoryId) {
         FoodCategory category = this.getById(categoryId);
         if (category == null) {
-            throw new BusinessException(4103, "分类不存在");
+            throw new BusinessException(BizErrorCode.CATEGORY_NOT_FOUND, "分类不存在");
         }
         return category;
     }
@@ -195,7 +196,7 @@ public class FoodCategoryServiceImpl extends ServiceImpl<FoodCategoryMapper, Foo
                         .eq(FoodItem::getCategoryId, categoryId)
         );
         if (itemCount != null && itemCount > 0) {
-            throw new BusinessException(4104, "当前分类下存在菜品，不能删除");
+            throw new BusinessException(BizErrorCode.CATEGORY_HAS_ITEMS, "当前分类下存在菜品，不能删除");
         }
 
         this.removeById(categoryId);
