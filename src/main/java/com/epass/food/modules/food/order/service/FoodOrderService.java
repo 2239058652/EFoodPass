@@ -5,6 +5,8 @@ import com.epass.food.common.page.PageResult;
 import com.epass.food.modules.food.order.dto.*;
 import com.epass.food.modules.food.order.entity.FoodOrder;
 
+import java.util.List;
+
 public interface FoodOrderService extends IService<FoodOrder> {
 
     PageResult<FoodOrderListResponse> listOrders(FoodOrderListQuery query);
@@ -26,4 +28,12 @@ public interface FoodOrderService extends IService<FoodOrder> {
     void createCurrentUserOrder(Long userId, AppOrderCreateRequest request);
 
     void cancelCurrentUserOrder(Long userId, Long orderId);
+
+    OrderStatOverviewResponse getOrderStatOverview();
+
+    List<OrderStatusCountResponse> getOrderStatusCounts();
+
+    List<OrderTopItemResponse> getTopSellingItems();
+
+    List<OrderDailyAmountResponse> getDailyAmounts();
 }

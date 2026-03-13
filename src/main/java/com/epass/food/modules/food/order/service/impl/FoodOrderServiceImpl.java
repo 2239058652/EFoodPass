@@ -24,10 +24,7 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -349,5 +346,142 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         FoodOrderUpdateStatusRequest request = new FoodOrderUpdateStatusRequest();
         request.setOrderId(orderId);
         cancelOrder(request);
+    }
+
+    @Override
+    public OrderStatOverviewResponse getOrderStatOverview() {
+        List<FoodOrder> orderList = this.list();
+
+        long pendingCount = 0L;
+        long processingCount = 0L;
+        long completedCount = 0L;
+        long canceledCount = 0L;
+        BigDecimal totalAmount = BigDecimal.ZERO;
+        BigDecimal completedAmount = BigDecimal.ZERO;
+
+        for (FoodOrder order : orderList) {
+            if (order.getTotalAmount() != null) {
+                totalAmount = totalAmount.add(order.getTotalAmount());
+            }
+
+            if (Integer.valueOf(ORDER_STATUS_PENDING).equals(order.getOrderStatus())) {
+                pendingCount++;
+            } else if (Integer.valueOf(ORDER_STATUS_PROCESSING).equals(order.getOrderStatus())) {
+                processingCount++;
+            } else if (Integer.valueOf(ORDER_STATUS_COMPLETED).equals(order.getOrderStatus())) {
+                completedCount++;
+                if (order.getTotalAmount() != null) {
+                    completedAmount = completedAmount.add(order.getTotalAmount());
+                }
+            } else if (Integer.valueOf(ORDER_STATUS_CANCELED).equals(order.getOrderStatus())) {
+                canceledCount++;
+            }
+        }
+
+        OrderStatOverviewResponse response = new OrderStatOverviewResponse();
+        response.setTotalOrderCount((long) orderList.size());
+        response.setPendingOrderCount(pendingCount);
+        response.setProcessingOrderCount(processingCount);
+        response.setCompletedOrderCount(completedCount);
+        response.setCanceledOrderCount(canceledCount);
+        response.setTotalAmount(totalAmount);
+        response.setCompletedAmount(completedAmount);
+        return response;
+    }
+
+    @Override
+    public List<OrderStatusCountResponse> getOrderStatusCounts() {
+        List<FoodOrder> orderList = this.list();
+
+        Map<Integer, Long> countMap = new LinkedHashMap<>();
+        countMap.put(ORDER_STATUS_PENDING, 0L);
+        countMap.put(ORDER_STATUS_PROCESSING, 0L);
+        countMap.put(ORDER_STATUS_COMPLETED, 0L);
+        countMap.put(ORDER_STATUS_CANCELED, 0L);
+
+        for (FoodOrder order : orderList) {
+            Integer status = order.getOrderStatus();
+            if (countMap.containsKey(status)) {
+                countMap.put(status, countMap.get(status) + 1);
+            }
+        }
+
+        List<OrderStatusCountResponse> responseList = new ArrayList<>();
+        for (Map.Entry<Integer, Long> entry : countMap.entrySet()) {
+            OrderStatusCountResponse response = new OrderStatusCountResponse();
+            response.setOrderStatus(entry.getKey());
+            response.setOrderCount(entry.getValue());
+            responseList.add(response);
+        }
+
+        return responseList;
+    }
+
+    @Override
+    public List<OrderTopItemResponse> getTopSellingItems() {
+        List<FoodOrder> completedOrders = this.list(
+                new LambdaQueryWrapper<FoodOrder>()
+                        .eq(FoodOrder::getOrderStatus, ORDER_STATUS_COMPLETED)
+        );
+        if (completedOrders.isEmpty()) {
+            return new ArrayList<>();
+        }
+
+        List<Long> orderIds = completedOrders.stream()
+                .map(FoodOrder::getId)
+                .toList();
+
+        List<FoodOrderItem> orderItemList = foodOrderItemMapper.selectList(
+                new LambdaQueryWrapper<FoodOrderItem>()
+                        .in(FoodOrderItem::getOrderId, orderIds)
+        );
+
+        Map<Long, OrderTopItemResponse> itemStatMap = new LinkedHashMap<>();
+        for (FoodOrderItem orderItem : orderItemList) {
+            OrderTopItemResponse stat = itemStatMap.get(orderItem.getFoodItemId());
+            if (stat == null) {
+                stat = new OrderTopItemResponse();
+                stat.setFoodItemId(orderItem.getFoodItemId());
+                stat.setFoodName(orderItem.getFoodNameSnapshot());
+                stat.setTotalQuantity(0L);
+                stat.setTotalAmount(BigDecimal.ZERO);
+                itemStatMap.put(orderItem.getFoodItemId(), stat);
+            }
+
+            stat.setTotalQuantity(stat.getTotalQuantity() + orderItem.getQuantity());
+            stat.setTotalAmount(stat.getTotalAmount().add(orderItem.getAmount()));
+        }
+
+        List<OrderTopItemResponse> responseList = new ArrayList<>(itemStatMap.values());
+        responseList.sort((a, b) -> Long.compare(b.getTotalQuantity(), a.getTotalQuantity()));
+        return responseList;
+    }
+
+    @Override
+    public List<OrderDailyAmountResponse> getDailyAmounts() {
+        List<FoodOrder> completedOrders = this.list(
+                new LambdaQueryWrapper<FoodOrder>()
+                        .eq(FoodOrder::getOrderStatus, ORDER_STATUS_COMPLETED)
+                        .orderByAsc(FoodOrder::getCreatedAt)
+        );
+
+        Map<String, BigDecimal> amountMap = new LinkedHashMap<>();
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+        for (FoodOrder order : completedOrders) {
+            String statDate = order.getCreatedAt().format(formatter);
+            BigDecimal oldAmount = amountMap.getOrDefault(statDate, BigDecimal.ZERO);
+            amountMap.put(statDate, oldAmount.add(order.getTotalAmount()));
+        }
+
+        List<OrderDailyAmountResponse> responseList = new ArrayList<>();
+        for (Map.Entry<String, BigDecimal> entry : amountMap.entrySet()) {
+            OrderDailyAmountResponse response = new OrderDailyAmountResponse();
+            response.setStatDate(entry.getKey());
+            response.setTotalAmount(entry.getValue());
+            responseList.add(response);
+        }
+
+        return responseList;
     }
 }
