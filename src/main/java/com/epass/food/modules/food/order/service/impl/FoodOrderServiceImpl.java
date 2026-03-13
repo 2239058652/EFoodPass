@@ -10,7 +10,18 @@ import com.epass.food.modules.food.category.entity.FoodCategory;
 import com.epass.food.modules.food.category.mapper.FoodCategoryMapper;
 import com.epass.food.modules.food.item.entity.FoodItem;
 import com.epass.food.modules.food.item.mapper.FoodItemMapper;
-import com.epass.food.modules.food.order.dto.*;
+import com.epass.food.modules.food.order.dto.AppOrderCreateRequest;
+import com.epass.food.modules.food.order.dto.FoodOrderCreateRequest;
+import com.epass.food.modules.food.order.dto.FoodOrderDetailResponse;
+import com.epass.food.modules.food.order.dto.FoodOrderItemRequest;
+import com.epass.food.modules.food.order.dto.FoodOrderItemResponse;
+import com.epass.food.modules.food.order.dto.FoodOrderListQuery;
+import com.epass.food.modules.food.order.dto.FoodOrderListResponse;
+import com.epass.food.modules.food.order.dto.FoodOrderUpdateStatusRequest;
+import com.epass.food.modules.food.order.dto.OrderDailyAmountResponse;
+import com.epass.food.modules.food.order.dto.OrderStatOverviewResponse;
+import com.epass.food.modules.food.order.dto.OrderStatusCountResponse;
+import com.epass.food.modules.food.order.dto.OrderTopItemResponse;
 import com.epass.food.modules.food.order.entity.FoodOrder;
 import com.epass.food.modules.food.order.entity.FoodOrderItem;
 import com.epass.food.modules.food.order.mapper.FoodOrderItemMapper;
@@ -26,7 +37,11 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.*;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -41,7 +56,6 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     private final FoodItemMapper foodItemMapper;
     private final FoodCategoryMapper foodCategoryMapper;
     private final SysUserMapper sysUserMapper;
-
     private final FoodStockLogService foodStockLogService;
 
     public FoodOrderServiceImpl(FoodOrderItemMapper foodOrderItemMapper,
@@ -223,8 +237,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
                 throw new BusinessException(BizErrorCode.ORDER_ITEM_STOCK_NOT_ENOUGH, "菜品库存不足，不能下单");
             }
 
-            int beforeStock = item.getStock();
-            item.setStock(beforeStock - totalQuantity);
+            item.setStock(item.getStock() - totalQuantity);
             itemsToUpdate.add(item);
         }
 

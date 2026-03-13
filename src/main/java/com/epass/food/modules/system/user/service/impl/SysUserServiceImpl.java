@@ -5,12 +5,20 @@ import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.baomidou.mybatisplus.extension.service.impl.ServiceImpl;
 import com.epass.food.common.exception.BusinessException;
 import com.epass.food.common.page.PageResult;
+import com.epass.food.common.result.BizErrorCode;
 import com.epass.food.modules.system.role.entity.SysRole;
 import com.epass.food.modules.system.role.entity.SysUserRole;
 import com.epass.food.modules.system.role.mapper.SysRoleMapper;
 import com.epass.food.modules.system.role.mapper.SysUserRoleMapper;
 import com.epass.food.modules.system.role.service.SysRoleService;
-import com.epass.food.modules.system.user.dto.*;
+import com.epass.food.modules.system.user.dto.UserAssignRoleRequest;
+import com.epass.food.modules.system.user.dto.UserCreateRequest;
+import com.epass.food.modules.system.user.dto.UserDetailResponse;
+import com.epass.food.modules.system.user.dto.UserListQuery;
+import com.epass.food.modules.system.user.dto.UserListResponse;
+import com.epass.food.modules.system.user.dto.UserResetPasswordRequest;
+import com.epass.food.modules.system.user.dto.UserUpdateRequest;
+import com.epass.food.modules.system.user.dto.UserUpdateStatusRequest;
 import com.epass.food.modules.system.user.entity.SysUser;
 import com.epass.food.modules.system.user.mapper.SysUserMapper;
 import com.epass.food.modules.system.user.service.SysUserService;
@@ -40,14 +48,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         this.sysRoleMapper = sysRoleMapper;
     }
 
-    /**
-     * 内部私有方法
-     * 获取用户列表响应对象
-     *
-     * @param user     用户对象
-     * @param roleList 角色列表
-     * @return 用户列表响应对象
-     */
     private static @NonNull UserListResponse getUserListResponse(SysUser user, List<SysRole> roleList) {
         List<String> roleCodes = new ArrayList<>();
         for (SysRole role : roleList) {
@@ -64,48 +64,20 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         return response;
     }
 
-    /**
-     * 内部私有方法
-     * 校验用户状态值
-     *
-     * @param status 用户状态值
-     */
     private void validateUserStatus(Integer status) {
         if (!Integer.valueOf(0).equals(status) && !Integer.valueOf(1).equals(status)) {
-            throw new BusinessException(4010, "用户状态值不合法");
+            throw new BusinessException(BizErrorCode.USER_STATUS_INVALID, "用户状态值不合法");
         }
     }
 
-    /**
-     * 根据用户名查询系统用户信息
-     *
-     * @param username 用户名，用于查询的唯一标识
-     * @return SysUser 匹配的用户对象，如果未找到则返回 null
-     * SELECT * FROM sys_user WHERE username = '你传入的用户名' LIMIT 1;
-     */
     @Override
     public SysUser getByUsername(String username) {
-        // 1. 创建一个针对 SysUser 实体类的 Lambda 条件构造器
         LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
-
-        // 2. 拼接 SQL 里的 WHERE 条件
-        // 相当于生成 SQL: WHERE username = 传入的参数值
         queryWrapper.eq(SysUser::getUsername, username);
-
-        // 3. 在生成的 SQL 语句最后面强行加上 "limit 1"
-        // 相当于生成 SQL: WHERE username = ? limit 1
         queryWrapper.last("limit 1");
-
-        // 4. 执行查询，并返回查询到的单个对象
         return this.getOne(queryWrapper);
     }
 
-    /**
-     * 查询用户列表
-     *
-     * @param query 查询条件
-     * @return 用户列表
-     */
     @Override
     public PageResult<UserListResponse> listUsers(UserListQuery query) {
         if (query == null) {
@@ -115,26 +87,23 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
 
         if (StringUtils.hasText(query.getUsername())) {
-            queryWrapper.like(SysUser::getUsername, query.getUsername());  // 用户名模糊查询
+            queryWrapper.like(SysUser::getUsername, query.getUsername());
         }
 
         if (query.getStatus() != null) {
-            queryWrapper.eq(SysUser::getStatus, query.getStatus()); // 按前端传的状态筛选
+            queryWrapper.eq(SysUser::getStatus, query.getStatus());
         }
 
-        queryWrapper.orderByDesc(SysUser::getId); // 按 ID 倒序排列（最新数据在前面）
+        queryWrapper.orderByDesc(SysUser::getId);
 
         Page<SysUser> page = new Page<>(query.getPageNum(), query.getPageSize());
-        Page<SysUser> userPage = this.page(page, queryWrapper); // 分页查询
-        List<SysUser> userList = userPage.getRecords(); // 取出当前页的数据列表
+        Page<SysUser> userPage = this.page(page, queryWrapper);
+        List<SysUser> userList = userPage.getRecords();
 
         List<UserListResponse> responseList = new ArrayList<>();
         for (SysUser user : userList) {
             List<SysRole> roleList = sysRoleService.getRolesByUserId(user.getId());
-
-            UserListResponse response = getUserListResponse(user, roleList);
-
-            responseList.add(response);
+            responseList.add(getUserListResponse(user, roleList));
         }
 
         PageResult<UserListResponse> result = new PageResult<>();
@@ -142,23 +111,17 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         result.setPageNum(userPage.getCurrent());
         result.setPageSize(userPage.getSize());
         result.setRecords(responseList);
-
         return result;
     }
 
-    /**
-     * 创建用户
-     *
-     * @param request 创建用户的请求参数
-     */
     @Override
     public void createUser(UserCreateRequest request) {
         SysUser existUser = this.getByUsername(request.getUsername());
         if (existUser != null) {
-            throw new BusinessException(4001, "用户名已存在");
+            throw new BusinessException(BizErrorCode.USERNAME_EXISTS, "用户名已存在");
         }
 
-        validateUserStatus(request.getStatus()); // 校验用户状态值
+        validateUserStatus(request.getStatus());
 
         SysUser user = new SysUser();
         user.setUsername(request.getUsername());
@@ -171,16 +134,11 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         this.save(user);
     }
 
-    /**
-     * 分配角色
-     *
-     * @param request 分配角色的请求参数
-     */
     @Override
     public void assignRoles(UserAssignRoleRequest request) {
         SysUser user = this.getById(request.getUserId());
         if (user == null) {
-            throw new BusinessException(4004, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
         }
 
         Long roleCount = sysRoleMapper.selectCount(
@@ -189,7 +147,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
                         .eq(SysRole::getStatus, 1)
         );
         if (roleCount == null || roleCount != request.getRoleIds().size()) {
-            throw new BusinessException(4005, "角色不存在或已禁用");
+            throw new BusinessException(BizErrorCode.USER_ROLE_NOT_FOUND_OR_DISABLED, "角色不存在或已禁用");
         }
 
         sysUserRoleMapper.delete(
@@ -205,42 +163,32 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         }
     }
 
-    /**
-     * 更新用户状态
-     *
-     * @param request 更新用户状态的请求参数
-     */
     @Override
     public void updateUserStatus(UserUpdateStatusRequest request) {
         SysUser user = this.getById(request.getUserId());
         if (user == null) {
-            throw new BusinessException(4004, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
         }
 
-        validateUserStatus(request.getStatus()); // 校验用户状态值
+        validateUserStatus(request.getStatus());
 
         if ("admin".equals(user.getUsername()) && Integer.valueOf(0).equals(request.getStatus())) {
-            throw new BusinessException(4011, "系统管理员不能被禁用");
+            throw new BusinessException(BizErrorCode.ADMIN_USER_CANNOT_DISABLE, "系统管理员不能被禁用");
         }
 
         user.setStatus(request.getStatus());
         this.updateById(user);
     }
 
-    /**
-     * 删除用户
-     *
-     * @param userId 用户ID
-     */
     @Override
     public void deleteUser(Long userId) {
         SysUser user = this.getById(userId);
         if (user == null) {
-            throw new BusinessException(4004, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
         }
 
         if ("admin".equals(user.getUsername())) {
-            throw new BusinessException(4016, "系统管理员不能被删除");
+            throw new BusinessException(BizErrorCode.ADMIN_USER_CANNOT_DELETE, "系统管理员不能被删除");
         }
 
         sysUserRoleMapper.delete(
@@ -251,63 +199,43 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         this.removeById(userId);
     }
 
-    /**
-     * 修改用户信息
-     *
-     * @param request 修改用户信息的请求参数
-     */
     @Override
     public void updateUser(UserUpdateRequest request) {
         SysUser user = this.getById(request.getId());
         if (user == null) {
-            throw new BusinessException(4004, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
         }
 
-        validateUserStatus(request.getStatus()); // 校验用户状态值
+        validateUserStatus(request.getStatus());
 
         if ("admin".equals(user.getUsername()) && Integer.valueOf(0).equals(request.getStatus())) {
-            throw new BusinessException(4011, "系统管理员不能被禁用");
+            throw new BusinessException(BizErrorCode.ADMIN_USER_CANNOT_DISABLE, "系统管理员不能被禁用");
         }
 
         user.setNickname(request.getNickname());
         user.setPhone(request.getPhone());
         user.setStatus(request.getStatus());
-
         this.updateById(user);
     }
 
-    /**
-     * 重置密码
-     * 旧的token 已失效
-     *
-     * @param request 重置密码的请求参数
-     */
     @Override
     public void resetPassword(UserResetPasswordRequest request) {
         SysUser user = this.getById(request.getUserId());
         if (user == null) {
-            throw new BusinessException(4004, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
-
         int oldVersion = user.getTokenVersion() == null ? 0 : user.getTokenVersion();
         user.setTokenVersion(oldVersion + 1);
-
         this.updateById(user);
     }
 
-    /**
-     * 获取用户详情
-     *
-     * @param userId 用户ID
-     * @return 用户详情
-     */
     @Override
     public UserDetailResponse getUserDetail(Long userId) {
         SysUser user = this.getById(userId);
         if (user == null) {
-            throw new BusinessException(4004, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
         }
 
         List<SysUserRole> userRoleList = sysUserRoleMapper.selectList(
@@ -327,8 +255,6 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
         response.setPhone(user.getPhone());
         response.setStatus(user.getStatus());
         response.setRoleIds(roleIds);
-
         return response;
     }
-
 }

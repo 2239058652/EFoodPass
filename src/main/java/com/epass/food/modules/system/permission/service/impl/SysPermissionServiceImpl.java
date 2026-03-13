@@ -4,7 +4,13 @@ import com.baomidou.mybatisplus.core.conditions.query.LambdaQueryWrapper;
 import com.baomidou.mybatisplus.extension.plugins.pagination.Page;
 import com.epass.food.common.exception.BusinessException;
 import com.epass.food.common.page.PageResult;
-import com.epass.food.modules.system.permission.dto.*;
+import com.epass.food.common.result.BizErrorCode;
+import com.epass.food.modules.system.permission.dto.PermissionCreateRequest;
+import com.epass.food.modules.system.permission.dto.PermissionDetailResponse;
+import com.epass.food.modules.system.permission.dto.PermissionListQuery;
+import com.epass.food.modules.system.permission.dto.PermissionListResponse;
+import com.epass.food.modules.system.permission.dto.PermissionUpdateRequest;
+import com.epass.food.modules.system.permission.dto.PermissionUpdateStatusRequest;
 import com.epass.food.modules.system.permission.entity.SysPermission;
 import com.epass.food.modules.system.permission.entity.SysRolePermission;
 import com.epass.food.modules.system.permission.mapper.SysPermissionMapper;
@@ -34,87 +40,58 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         this.sysPermissionMapper = sysPermissionMapper;
     }
 
-    /**
-     * 校验权限状态
-     *
-     * @param status 权限状态
-     */
     private void validatePermissionStatus(Integer status) {
         if (!Integer.valueOf(0).equals(status) && !Integer.valueOf(1).equals(status)) {
-            throw new BusinessException(4014, "权限状态值不合法");
+            throw new BusinessException(BizErrorCode.PERMISSION_STATUS_INVALID, "权限状态值不合法");
         }
     }
 
-    /**
-     * 校验权限类型
-     *
-     * @param permType 权限类型
-     */
     private void validatePermissionType(Integer permType) {
         if (!Integer.valueOf(1).equals(permType)
                 && !Integer.valueOf(2).equals(permType)
                 && !Integer.valueOf(3).equals(permType)) {
-            throw new BusinessException(4019, "权限类型值不合法");
+            throw new BusinessException(BizErrorCode.PERMISSION_TYPE_INVALID, "权限类型值不合法");
         }
     }
 
-    /**
-     * 根据用户 id 查询权限列表
-     *
-     * @param userId 用户 id
-     * @return 权限列表
-     */
     @Override
     public List<String> getPermissionCodesByUserId(Long userId) {
-        // 1. 先看这个用户有哪些角色
-        // 2. 再看这些角色关联了哪些权限
-        // 3. 再查这些权限到底是什么
-        // 4. 最后把权限编码列表返回出去
-        // 最终你拿到的是：["admin:dashboard"]
-
-        // 根据用户 id，查这个用户有哪些角色
         List<SysRole> roleList = sysRoleService.getRolesByUserId(userId);
         if (roleList == null || roleList.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 把角色对象变成角色 id 列表
         List<Long> roleIds = new ArrayList<>();
         for (SysRole role : roleList) {
             roleIds.add(role.getId());
         }
 
-        // 根据角色 id 列表查角色权限关联表
         LambdaQueryWrapper<SysRolePermission> rolePermissionQuery = new LambdaQueryWrapper<>();
-        rolePermissionQuery.in(SysRolePermission::getRoleId, roleIds); // 查这些角色分别绑定了哪些权限
+        rolePermissionQuery.in(SysRolePermission::getRoleId, roleIds);
 
         List<SysRolePermission> rolePermissionList = sysRolePermissionMapper.selectList(rolePermissionQuery);
         if (rolePermissionList == null || rolePermissionList.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 从角色权限关联里提取权限 id 列表
         List<Long> permissionIds = new ArrayList<>();
         for (SysRolePermission rolePermission : rolePermissionList) {
             permissionIds.add(rolePermission.getPermissionId());
         }
 
-        // 根据权限 id 列表，查权限表
         LambdaQueryWrapper<SysPermission> permissionQuery = new LambdaQueryWrapper<>();
-        permissionQuery.in(SysPermission::getId, permissionIds); // where id in (这些权限id)
-        permissionQuery.eq(SysPermission::getStatus, 1); // where status = 1 查启用状态的权限
+        permissionQuery.in(SysPermission::getId, permissionIds);
+        permissionQuery.eq(SysPermission::getStatus, 1);
 
         List<SysPermission> permissionList = sysPermissionMapper.selectList(permissionQuery);
         if (permissionList == null || permissionList.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 获取权限列表的权限码
         List<String> permissionCodes = new ArrayList<>();
         for (SysPermission permission : permissionList) {
             permissionCodes.add(permission.getPermCode());
         }
-
         return permissionCodes;
     }
 
@@ -138,10 +115,9 @@ public class SysPermissionServiceImpl implements SysPermissionService {
 
         Page<SysPermission> page = new Page<>(query.getPageNum(), query.getPageSize());
         Page<SysPermission> permissionPage = sysPermissionMapper.selectPage(page, queryWrapper);
-        List<SysPermission> permissionList = permissionPage.getRecords();
 
         List<PermissionListResponse> responseList = new ArrayList<>();
-        for (SysPermission permission : permissionList) {
+        for (SysPermission permission : permissionPage.getRecords()) {
             PermissionListResponse response = new PermissionListResponse();
             response.setId(permission.getId());
             response.setPermCode(permission.getPermCode());
@@ -161,11 +137,6 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         return result;
     }
 
-    /**
-     * 新增权限
-     *
-     * @param request 新增权限请求参数
-     */
     @Override
     public void createPermission(PermissionCreateRequest request) {
         Long count = sysPermissionMapper.selectCount(
@@ -173,12 +144,11 @@ public class SysPermissionServiceImpl implements SysPermissionService {
                         .eq(SysPermission::getPermCode, request.getPermCode())
         );
         if (count != null && count > 0) {
-            throw new BusinessException(4009, "权限编码已存在");
+            throw new BusinessException(BizErrorCode.PERMISSION_CODE_EXISTS, "权限编码已存在");
         }
 
-        validatePermissionStatus(request.getStatus()); // 权限状态值校验
-
-        validatePermissionType(request.getPermType()); // 权限类型值校验
+        validatePermissionStatus(request.getStatus());
+        validatePermissionType(request.getPermType());
 
         SysPermission permission = new SysPermission();
         permission.setPermCode(request.getPermCode());
@@ -187,46 +157,35 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         permission.setPath(request.getPath());
         permission.setMethod(request.getMethod());
         permission.setStatus(request.getStatus());
-
         sysPermissionMapper.insert(permission);
     }
 
-    /**
-     * 修改权限状态
-     *
-     * @param request 修改权限状态请求参数
-     */
     @Override
     public void updatePermissionStatus(PermissionUpdateStatusRequest request) {
         SysPermission permission = sysPermissionMapper.selectById(request.getPermissionId());
         if (permission == null) {
-            throw new BusinessException(4008, "权限不存在");
+            throw new BusinessException(BizErrorCode.PERMISSION_NOT_FOUND, "权限不存在");
         }
 
-        validatePermissionStatus(request.getStatus()); // 权限状态值校验
+        validatePermissionStatus(request.getStatus());
 
         if ("admin:dashboard".equals(permission.getPermCode()) && Integer.valueOf(0).equals(request.getStatus())) {
-            throw new BusinessException(4015, "核心权限不能被禁用");
+            throw new BusinessException(BizErrorCode.CORE_PERMISSION_CANNOT_DISABLE, "核心权限不能被禁用");
         }
 
         permission.setStatus(request.getStatus());
         sysPermissionMapper.updateById(permission);
     }
 
-    /**
-     * 删除权限
-     *
-     * @param permissionId 权限ID
-     */
     @Override
     public void deletePermission(Long permissionId) {
         SysPermission permission = sysPermissionMapper.selectById(permissionId);
         if (permission == null) {
-            throw new BusinessException(4008, "权限不存在");
+            throw new BusinessException(BizErrorCode.PERMISSION_NOT_FOUND, "权限不存在");
         }
 
         if ("admin:dashboard".equals(permission.getPermCode())) {
-            throw new BusinessException(4018, "核心权限不能被删除");
+            throw new BusinessException(BizErrorCode.CORE_PERMISSION_CANNOT_DELETE, "核心权限不能被删除");
         }
 
         sysRolePermissionMapper.delete(
@@ -237,24 +196,18 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         sysPermissionMapper.deleteById(permissionId);
     }
 
-    /**
-     * 修改权限基础信息
-     *
-     * @param request 修改权限请求参数
-     */
     @Override
     public void updatePermission(PermissionUpdateRequest request) {
         SysPermission permission = sysPermissionMapper.selectById(request.getId());
         if (permission == null) {
-            throw new BusinessException(4008, "权限不存在");
+            throw new BusinessException(BizErrorCode.PERMISSION_NOT_FOUND, "权限不存在");
         }
 
-        validatePermissionStatus(request.getStatus()); // 权限状态值校验
-
-        validatePermissionType(request.getPermType()); // 权限类型值校验
+        validatePermissionStatus(request.getStatus());
+        validatePermissionType(request.getPermType());
 
         if ("admin:dashboard".equals(permission.getPermCode()) && Integer.valueOf(0).equals(request.getStatus())) {
-            throw new BusinessException(4015, "核心权限不能被禁用");
+            throw new BusinessException(BizErrorCode.CORE_PERMISSION_CANNOT_DISABLE, "核心权限不能被禁用");
         }
 
         permission.setPermName(request.getPermName());
@@ -262,21 +215,14 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         permission.setPath(request.getPath());
         permission.setMethod(request.getMethod());
         permission.setStatus(request.getStatus());
-
         sysPermissionMapper.updateById(permission);
     }
 
-    /**
-     * 查询权限详情
-     *
-     * @param permissionId 权限ID
-     * @return 权限详情
-     */
     @Override
     public PermissionDetailResponse getPermissionDetail(Long permissionId) {
         SysPermission permission = sysPermissionMapper.selectById(permissionId);
         if (permission == null) {
-            throw new BusinessException(4008, "权限不存在");
+            throw new BusinessException(BizErrorCode.PERMISSION_NOT_FOUND, "权限不存在");
         }
 
         PermissionDetailResponse response = new PermissionDetailResponse();
@@ -287,8 +233,6 @@ public class SysPermissionServiceImpl implements SysPermissionService {
         response.setPath(permission.getPath());
         response.setMethod(permission.getMethod());
         response.setStatus(permission.getStatus());
-
         return response;
     }
-
 }
