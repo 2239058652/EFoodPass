@@ -1,363 +1,123 @@
-﻿# EFoodPass Project Handoff
+# EFoodPass Project Handoff
 
-## 1. Project Overview
+## 1. Current Project Position
 
-This project is a Spring Boot 3 + Spring Security + MyBatis-Plus + MySQL backend.
+This project is no longer just an RBAC skeleton.
 
-Current focus has been the backend management foundation first, not the food business modules yet.
+At the current stage, it already contains a usable first-version backend with:
 
-The project already has a usable RBAC skeleton and a substantial part of the system-management APIs.
+- JWT authentication
+- Spring Security based permission control
+- system user / role / permission management
+- food category management
+- food item management
+- backend order management
+- current-user order APIs
+- order statistics
+- stock adjustment
+- stock change logs
 
-Core stack already in use:
+The project has moved from "system foundation only" into "business backend first version is structurally complete".
+
+---
+
+## 2. Core Stack
+
+Confirmed stack in use:
+
 - Spring Boot 3.5.x
 - Spring Security
+- Spring Validation
 - MyBatis-Plus
 - MySQL
-- Redis dependency exists, but Redis is intentionally not deeply integrated yet
 - JWT via `jjwt`
 - Lombok
+- Swagger / SpringDoc OpenAPI
+- Redis dependency exists but is not a core runtime dependency for the current business flow
 
-## 2. What Has Been Completed
+Java version:
 
-### 2.1 Authentication and Security Foundation
-Implemented and working:
-- `Result<T>` unified response structure
+- Java 17
+
+Main dependency definition:
+
+- `pom.xml`
+
+---
+
+## 3. What Is Already Completed
+
+### 3.1 Infrastructure and Shared Foundation
+
+Already completed:
+
+- unified `Result<T>` response wrapper
+- unified `PageQuery` / `PageResult<T>`
 - `BusinessException`
 - `GlobalExceptionHandler`
-- Spring Security basic configuration
-- JWT login flow
+- `BizErrorCode` constant class
+- MyBatis-Plus pagination configuration
+- Swagger / OpenAPI configuration
+
+Important files:
+
+- `src/main/java/com/epass/food/common/result/Result.java`
+- `src/main/java/com/epass/food/common/page/PageQuery.java`
+- `src/main/java/com/epass/food/common/page/PageResult.java`
+- `src/main/java/com/epass/food/common/exception/BusinessException.java`
+- `src/main/java/com/epass/food/common/exception/GlobalExceptionHandler.java`
+- `src/main/java/com/epass/food/common/result/BizErrorCode.java`
+- `src/main/java/com/epass/food/config/MybatisPlusConfig.java`
+- `src/main/java/com/epass/food/config/OpenApiConfig.java`
+
+### 3.2 Authentication and Security
+
+Already completed:
+
 - `/auth/login`
 - `/auth/me`
-- JWT filter parses token and restores login state
-- `tokenVersion` validation is already wired into JWT validation
-- `AuthenticationEntryPointImpl` for unauthenticated `401`
-- `AccessDeniedHandlerImpl` plus `GlobalExceptionHandler` handling for forbidden `403`
-- `PasswordEncoder` bean extracted into standalone `PasswordConfig`
+- JWT generation and parsing
+- token version validation
+- current user restored on each request
+- unauthenticated handling
+- forbidden handling
 
-Important behavior already confirmed:
-- Multiple valid tokens per user are currently allowed by design
-- `tokenVersion` is checked on each request
-- Resetting password increments `tokenVersion` so old tokens become invalid
-- Disabled users lose access because JWT filter checks `user.status == 1`
+Important behavior:
 
-### 2.2 RBAC Core
-Implemented and working:
-- User -> Role relation
-- Role -> Permission relation
-- Role-based authorization via `hasRole(...)`
-- Permission-based authorization via `hasAuthority(...)`
-- `/auth/me` returns:
-  - current user basic info
-  - `roleCodes`
-  - `permissionCodes`
+- multiple valid tokens per user are still allowed by design
+- resetting password increments `tokenVersion`
+- old tokens become invalid naturally after password reset
+- disabled users lose access because current user status is checked during auth
 
-Current authorization model:
-- Roles are converted to `ROLE_xxx`
-- Permissions are directly added as `SimpleGrantedAuthority(permissionCode)`
-- JWT token itself only carries minimal identity info
-- Roles and permissions are restored from DB on each request through the JWT filter
+Important files:
 
-### 2.3 Initialization SQL / Deployment Bootstrapping
-A full RBAC initialization design was completed in the conversation.
-
-Initialization content includes:
-- admin user
-- ADMIN role
-- base permissions
-- user-role relation
-- role-permission relation
-
-Admin account agreed in design:
-- username: `admin`
-- password: `Admin@123`
-- bcrypt hash used in SQL:
-  - `$2a$10$ul9WaxC8WF.7P0vzj0og5uswfqT1foa7ZjPi1lh/F7LCaMTKszx92`
-
-Important:
-- `sql/init-rbac.sql` now exists on disk
-- later chats should read and reuse this file instead of redesigning it from scratch
-- only recreate it if it is missing or clearly corrupted
-
-### 2.4 System Management APIs Already Built
-#### User module
-Implemented:
-- user list
-- user detail
-- create user
-- update user basic info
-- update user status
-- delete user
-- assign roles to user
-- reset user password
-
-#### Role module
-Implemented:
-- role list
-- role detail
-- create role
-- update role basic info
-- update role status
-- delete role
-- assign permissions to role
-
-#### Permission module
-Implemented:
-- permission list
-- permission detail
-- create permission
-- update permission basic info
-- update permission status
-- delete permission
-
-## 3. Current Code Structure
-
-Main packages:
-- `com.epass.food.common`
-  - `exception`
-  - `page`
-  - `result`
-- `com.epass.food.config`
-  - `MybatisPlusConfig`
-  - `PasswordConfig`
-- `com.epass.food.config.security`
-  - `SecurityConfig`
-  - `JwtAuthenticationFilter`
-  - `JwtTokenProvider`
-  - `JwtProperties`
-  - `AuthenticationEntryPointImpl`
-  - `AccessDeniedHandlerImpl`
-  - `LoginUser`
-- `com.epass.food.modules.auth`
-- `com.epass.food.modules.system.user`
-- `com.epass.food.modules.system.role`
-- `com.epass.food.modules.system.permission`
-
-Notable files:
 - `src/main/java/com/epass/food/config/security/SecurityConfig.java`
 - `src/main/java/com/epass/food/config/security/JwtAuthenticationFilter.java`
+- `src/main/java/com/epass/food/config/security/JwtTokenProvider.java`
+- `src/main/java/com/epass/food/config/security/LoginUser.java`
+- `src/main/java/com/epass/food/modules/auth/controller/AuthController.java`
 - `src/main/java/com/epass/food/modules/auth/service/impl/AuthServiceImpl.java`
-- `src/main/java/com/epass/food/modules/system/user/service/impl/SysUserServiceImpl.java`
-- `src/main/java/com/epass/food/modules/system/role/service/impl/SysRoleServiceImpl.java`
-- `src/main/java/com/epass/food/modules/system/permission/service/impl/SysPermissionServiceImpl.java`
 
-## 4. Important Current Technical State
+### 3.3 RBAC and System Management
 
-### 4.1 User list pagination is implemented
-Observed in code:
-- `common/page/PageQuery.java`
-- `common/page/PageResult.java`
-- `UserListQuery extends PageQuery`
-- `SysUserService.listUsers(...)` now returns `PageResult<UserListResponse>`
-- `SysUserServiceImpl.listUsers(...)` uses MyBatis-Plus `Page<SysUser>`
-- `MybatisPlusConfig` already contains `PaginationInnerInterceptor`
+Already completed:
 
-So user pagination is no longer planned work; it is already implemented and being used as the reference pattern for other list modules.
+- user management
+- role management
+- permission management
+- user-role binding
+- role-permission binding
+- interface-level permission control with `@PreAuthorize`
 
-### 4.2 Role and permission list pagination are now implemented
-Current confirmed state in code:
-- `RoleListQuery extends PageQuery`
-- `PermissionListQuery extends PageQuery`
-- `SysRoleService.listRoles(...)` returns `PageResult<RoleListResponse>`
-- `SysPermissionService.listPermissions(...)` returns `PageResult<PermissionListResponse>`
-- role / permission controllers now return paged list results instead of plain `List<...>`
+Implemented system APIs:
 
-So the original pagination follow-up has already been completed.
+#### Auth
 
-### 4.3 Management-module consistency polish has started and partly landed
-Confirmed improvements already applied in code:
-- `listUsers(...)`, `listRoles(...)`, `listPermissions(...)` now all guard `query == null` and fall back to default paging query objects
-- user status validation was aligned across create / update / update-status flows
-- role status validation was aligned across create / update / update-status flows
-- permission status validation was aligned across create / update / update-status flows
-- permission type validation was aligned across create / update flows
-- duplicated validation logic in service layer has begun to be extracted into private helper methods
-- helper methods now include patterns such as:
-  - `validateUserStatus(...)`
-  - `validateRoleStatus(...)`
-  - `validatePermissionStatus(...)`
-  - `validatePermissionType(...)`
-
-This means the project has already entered Phase 2 "management polish", not just Phase 1 pagination.
-
-### 4.4 Redis is intentionally deferred
-Important project decision from the conversation:
-- Redis should be integrated later
-- Do not rush Redis into the current stage
-- Current backend core should first be made structurally complete
-
-Planned Redis use cases for later:
-- captcha
-- SMS/email verification code
-- token blacklist
-- refresh-token/session management
-- permission cache
-- rate limiting
-
-## 5. Known Business Rules Already Agreed
-
-### 5.1 Stable identifiers should not be casually editable
-Do not casually allow editing of:
-- `username`
-- `roleCode`
-- `permCode`
-
-Current design intentionally treats them as stable business identifiers.
-
-### 5.2 Core built-in entities are protected
-Current agreed protections include:
-- admin user cannot be deleted
-- admin user cannot be disabled
-- ADMIN role cannot be deleted
-- ADMIN role cannot be disabled
-- `admin:dashboard` permission cannot be deleted
-- `admin:dashboard` permission cannot be disabled
-
-### 5.3 Delete operations must clear relations first
-Agreed deletion rule:
-- delete user: clear `sys_user_role` first
-- delete role: clear `sys_user_role` and `sys_role_permission` first
-- delete permission: clear `sys_role_permission` first
-
-### 5.4 Password changes must invalidate old tokens
-Already reflected in service logic:
-- reset password increments `tokenVersion`
-- old JWT becomes invalid naturally
-
-## 6. Important Design Decisions From the Conversation
-
-### 6.1 Multi-token strategy is currently intentional
-The project currently allows multiple valid JWTs per user.
-This is not treated as a bug.
-
-Decision made in conversation:
-- keep multi-token valid for now
-- do not switch to "new login invalidates old login" yet
-- if needed later, Redis or login-session management can be introduced
-
-### 6.2 Token should carry minimal identity, not full auth graph
-Agreed design:
-- token carries minimal identity info
-- roles and permissions are read from DB during request authentication
-- this keeps permission changes effective without needing token refresh for every auth change
-
-### 6.3 Service layer should own business logic aggregation
-Repeatedly reinforced during development:
-- Controller should stay thin
-- Service layer should aggregate entity, role, permission logic
-- DTOs should not be replaced by direct entity returns
-
-### 6.4 Detail permissions are intentionally still reused for now
-Current explicit decision from the follow-up conversation:
-- detail endpoints continue reusing list permissions for the current stage
-- do not split `system:user:detail`, `system:role:detail`, `system:permission:detail` yet
-- if frontend later needs finer-grained control, detail permissions can be introduced in a later refactor
-
-## 7. Current Inconsistencies / Things To Clean Up Later
-
-### 7.1 Some source comments are garbled
-Some Java source comments show encoding-garbled Chinese text.
-This seems to come from previous file encoding issues.
-It does not necessarily break code, but should be cleaned later.
-
-Recommended later task:
-- normalize file encoding to UTF-8
-- clean broken Chinese comments
-
-### 7.2 Error codes are currently handwritten in many places
-Current code uses many numeric business codes directly, for example:
-- `4004`
-- `4010`
-- `4016`
-- etc.
-
-Recommended later refactor:
-- centralize these in `ResultCode` or a dedicated business error enum set
-
-### 7.3 Some list/detail permissions are reused
-For simplicity, detail endpoints currently still reuse list permissions, for example:
-- `GET /system/user/{id}` uses `system:user:list`
-- `GET /system/role/{id}` uses `system:role:list`
-- `GET /system/permission/{id}` uses `system:permission:list`
-
-This is intentional at the current stage.
-Do not change this casually in the next chat.
-Only split into separate detail permissions later if the frontend actually needs finer-grained control.
-
-### 7.4 Swagger / OpenAPI was added after the original handoff draft
-Current confirmed state from the follow-up conversation:
-- Swagger dependency has been added via `springdoc-openapi-starter-webmvc-ui`
-- Spring Security has been configured to permit:
-  - `/v3/api-docs/**`
-  - `/swagger-ui/**`
-  - `/swagger-ui.html`
-- OpenAPI basic config has been added in `src/main/java/com/epass/food/config/OpenApiConfig.java`
-- Swagger entry path is `/swagger-ui.html`
-- `/v3/api-docs` and Swagger UI were both manually verified to open successfully
-
-This means API documentation is now usable and should be used to help verify later modules.
-Do not spend the next chat re-adding Swagger unless the code on disk has clearly lost those changes.
-
-## 8. What Should Be Done Next
-
-Recommended next priority order:
-
-### Phase 1: Current foundation status
-Already completed in code:
-1. user list pagination
-2. role list pagination
-3. permission list pagination
-4. Swagger / OpenAPI basic access
-5. a first round of management-endpoint consistency fixes
-
-### Phase 2: Continue remaining system-management polish
-Recommended remaining polish items:
-1. audit whether there are still any missing validation consistency gaps
-2. optionally centralize handwritten business error codes into enum / constants
-3. keep detail endpoints reusing list permissions for now
-4. only introduce separate detail permissions later if frontend needs them
-
-### Phase 3: Start first real business module
-Recommended first business module:
-- `food_category`
-
-Reason:
-- simple structure
-- good CRUD training target
-- foundation for `food_item`
-- now easier to build and verify because Swagger is available
-
-Recommended first tasks inside `food_category`:
-1. confirm final table fields to use from existing SQL design
-2. design CRUD endpoint list and DTOs
-3. define status / name uniqueness / delete rules
-4. then implement backend step by step
-
-## 9. Suggested Immediate Next Task In New Chat
-
-If opening a new conversation, ask the new assistant to do this first:
-
-1. Read this handoff document
-2. Confirm current Swagger is already working instead of re-adding it
-3. Keep current rule that detail endpoints still reuse list permissions
-4. Do not restart old pagination work; it is already complete
-5. Continue with `food_category` module design first:
-   - fields
-   - DTOs
-   - endpoint list
-   - business rules
-6. Then implement `food_category` step by step
-7. Use Swagger to verify each new endpoint as it is added
-8. Continue using teaching style step by step, not all-at-once takeover
-
-That is now the most natural continuation point based on the latest code state.
-
-## 10. API Capability Summary
-
-### Auth
 - `POST /auth/login`
 - `GET /auth/me`
 
-### User management
+#### User management
+
 - `GET /system/user/list`
 - `GET /system/user/{id}`
 - `POST /system/user`
@@ -367,7 +127,8 @@ That is now the most natural continuation point based on the latest code state.
 - `POST /system/user/assign-role`
 - `DELETE /system/user/{id}`
 
-### Role management
+#### Role management
+
 - `GET /system/role/list`
 - `GET /system/role/{id}`
 - `POST /system/role`
@@ -376,7 +137,8 @@ That is now the most natural continuation point based on the latest code state.
 - `POST /system/role/assign-permission`
 - `DELETE /system/role/{id}`
 
-### Permission management
+#### Permission management
+
 - `GET /system/permission/list`
 - `GET /system/permission/{id}`
 - `POST /system/permission`
@@ -384,34 +146,503 @@ That is now the most natural continuation point based on the latest code state.
 - `PUT /system/permission/status`
 - `DELETE /system/permission/{id}`
 
+Important business protections already in code:
+
+- admin user cannot be disabled
+- admin user cannot be deleted
+- ADMIN role cannot be disabled
+- ADMIN role cannot be deleted
+- core permission `admin:dashboard` cannot be disabled
+- core permission `admin:dashboard` cannot be deleted
+
+### 3.4 Food Business Modules
+
+These modules are now already implemented, not just planned.
+
+#### Food Category
+
+Implemented:
+
+- category list
+- category detail
+- create category
+- update category
+- update category status
+- delete category
+
+APIs:
+
+- `GET /food/category/list`
+- `GET /food/category/{id}`
+- `POST /food/category`
+- `PUT /food/category`
+- `PUT /food/category/status`
+- `DELETE /food/category/{id}`
+
+Business rules already enforced:
+
+- category name required
+- category name unique
+- status only `0/1`
+- deleting a category requires no `food_item` reference
+
+Important files:
+
+- `src/main/java/com/epass/food/modules/food/category/controller/FoodCategoryController.java`
+- `src/main/java/com/epass/food/modules/food/category/service/impl/FoodCategoryServiceImpl.java`
+
+#### Food Item
+
+Implemented:
+
+- item list
+- item detail
+- create item
+- update item
+- update on-sale status
+- manual stock adjustment
+- delete item
+
+APIs:
+
+- `GET /food/item/list`
+- `GET /food/item/{id}`
+- `POST /food/item`
+- `PUT /food/item`
+- `PUT /food/item/on-sale`
+- `PUT /food/item/stock`
+- `DELETE /food/item/{id}`
+
+Business rules already enforced:
+
+- category must exist
+- category must be enabled for item create/update
+- item name unique inside same category
+- `price >= 0`
+- `stock >= 0`
+- `isOnSale` only `0/1`
+- enabling on-sale is blocked if category is disabled
+- deleting item is blocked if referenced by order items
+
+Important files:
+
+- `src/main/java/com/epass/food/modules/food/item/controller/FoodItemController.java`
+- `src/main/java/com/epass/food/modules/food/item/service/impl/FoodItemServiceImpl.java`
+
+#### Food Order
+
+Implemented:
+
+- backend order list
+- backend order detail
+- backend create order
+- backend process order
+- backend cancel order
+- backend complete order
+- current-user order list
+- current-user order detail
+- current-user create order
+- current-user cancel order
+- order overview stats
+- order status count stats
+- top item stats
+- daily amount stats
+
+Backend order APIs:
+
+- `GET /food/order/list`
+- `GET /food/order/{id}`
+- `POST /food/order`
+- `PUT /food/order/process`
+- `PUT /food/order/cancel`
+- `PUT /food/order/complete`
+
+Current-user order APIs:
+
+- `GET /app/order/list`
+- `GET /app/order/{id}`
+- `POST /app/order`
+- `PUT /app/order/cancel/{id}`
+
+Order stat APIs:
+
+- `GET /food/order/stat/overview`
+- `GET /food/order/stat/status-count`
+- `GET /food/order/stat/top-item`
+- `GET /food/order/stat/daily-amount`
+
+Current order status flow:
+
+- `10` pending
+- `20` processing
+- `30` completed
+- `40` canceled
+
+Important business behavior already in code:
+
+- order create checks user existence and user enabled status
+- order create checks item existence
+- order create checks item on-sale status
+- order create checks category enabled status
+- order create checks stock
+- repeated same `foodItemId` in one order request is aggregated before stock validation
+- order create deducts stock
+- cancel order restores stock
+- stock change logs are written during deduct/restore
+- current-user order APIs check ownership
+
+Important files:
+
+- `src/main/java/com/epass/food/modules/food/order/controller/FoodOrderController.java`
+- `src/main/java/com/epass/food/modules/food/order/controller/AppOrderController.java`
+- `src/main/java/com/epass/food/modules/food/order/controller/FoodOrderStatController.java`
+- `src/main/java/com/epass/food/modules/food/order/service/impl/FoodOrderServiceImpl.java`
+
+#### Food Stock Log
+
+Implemented:
+
+- stock log table
+- stock log entity / mapper / service
+- stock log list API
+- stock log writes for:
+  - order deduct
+  - order restore
+  - manual stock adjust
+
+APIs:
+
+- `GET /food/stock-log/list`
+
+Important files:
+
+- `src/main/java/com/epass/food/modules/food/stock/controller/FoodStockLogController.java`
+- `src/main/java/com/epass/food/modules/food/stock/service/impl/FoodStockLogServiceImpl.java`
+
+---
+
+## 4. Current SQL / Deployment State
+
+### 4.1 Initialization SQL
+
+The main initialization script is:
+
+- `sql/init-rbac.sql`
+
+This file has already been reworked to match the current backend state.
+
+Current confirmed contents:
+
+- database creation
+- system tables
+- food business tables
+- stock log table
+- admin user
+- ADMIN role
+- system permissions
+- food category permissions
+- food item permissions
+- food order permissions
+- food stock log permissions
+
+Important fixes already applied:
+
+- `food:item:update-stock` permission exists
+- `food:order:stat` permission is inserted before admin binding
+- `food:stock-log` and `food:stock-log:list` permissions exist
+- `token_version` uses `ADD COLUMN IF NOT EXISTS`
+- tables use `CREATE TABLE IF NOT EXISTS`
+
+Current practical conclusion:
+
+- this SQL is suitable as a new-database initialization script
+- it is not meant to be treated as a sophisticated migration history system
+
+### 4.2 Admin initialization
+
+Admin credentials agreed in project context:
+
+- username: `admin`
+- password: `Admin@123`
+
+The bcrypt hash is already placed in SQL.
+
+---
+
+## 5. Important File and Directory Meaning
+
+### Root level
+
+- `pom.xml`
+  - Maven dependency and plugin definition
+- `sql/`
+  - database initialization
+- `src/main/resources/`
+  - Spring Boot config files
+- `README.md`
+  - project-level structural explanation
+- `FRONTEND_LLM_GUIDE.md`
+  - long-form guide for another model to generate frontend correctly
+- `FRONTEND_LLM_PROMPT.md`
+  - short prompt for another model to generate frontend correctly
+
+### Java source root
+
+- `src/main/java/com/epass/food/common`
+  - global shared utilities and contracts
+- `src/main/java/com/epass/food/config`
+  - framework configuration
+- `src/main/java/com/epass/food/modules`
+  - business and system modules
+
+### Modules
+
+- `modules/auth`
+  - login and current-user APIs
+- `modules/system`
+  - user / role / permission management
+- `modules/food`
+  - category / item / order / stock-log business
+- `modules/admin`
+  - not a core business area right now
+- `modules/test`
+  - test/demo style code, not core business
+
+---
+
+## 6. Current Code Style and Architectural Rules
+
+These are the patterns already reinforced in the project and should continue unless there is a strong reason to change them.
+
+### 6.1 Thin Controller, Business in Service
+
+Controllers should:
+
+- receive request
+- do parameter binding
+- call service
+- return `Result`
+
+Business logic should live in service implementation classes.
+
+### 6.2 DTO-based API boundary
+
+Do not return entities directly as API output unless there is a very good reason.
+
+Use:
+
+- `*Query`
+- `*CreateRequest`
+- `*UpdateRequest`
+- `*Response`
+
+### 6.3 Stable identifiers should remain stable
+
+Do not casually make these editable:
+
+- username
+- roleCode
+- permCode
+
+They are treated as stable business identifiers.
+
+### 6.4 Permission source of truth
+
+Permission strings should be aligned between:
+
+- `@PreAuthorize(...)` in controller
+- `sql/init-rbac.sql`
+
+If one side changes and the other does not, admin login may still get `403`.
+
+### 6.5 Unified error handling
+
+Project now uses:
+
+- `BusinessException`
+- `BizErrorCode`
+
+Formal business modules have already mostly moved away from raw numeric codes.
+
+---
+
+## 7. Important Current Constraints / Known Limits
+
+### 7.1 Redis is still deferred
+
+Redis dependency exists, but Redis is intentionally not deeply integrated into the current main flow.
+
+Potential later use cases:
+
+- captcha
+- SMS/email code
+- token blacklist
+- refresh token/session control
+- permission cache
+- rate limit
+
+Do not force Redis into the current phase unless a new requirement really needs it.
+
+### 7.2 Multi-token strategy is still intentional
+
+Current rule:
+
+- a user can have multiple valid JWT tokens
+
+This is not currently treated as a bug.
+
+### 7.3 Inventory concurrency is not fully hardened yet
+
+Current stock logic covers:
+
+- create order stock validation
+- stock deduct
+- cancel restore
+- duplicate item aggregation inside one request
+
+But this is still a first-version implementation, not a high-concurrency inventory locking design.
+
+Future strengthening area:
+
+- optimistic locking
+- conditional stock update
+- stronger concurrent oversell prevention
+
+### 7.4 Some legacy comments / display still have encoding history
+
+Although several core files were rewritten and cleaned, there may still be legacy comment encoding issues in non-core files or in terminal display.
+
+Do not assume every garbled terminal line means the source file is broken.
+
+---
+
+## 8. Frontend Guidance Already Added
+
+This round also added explicit docs for another model to generate frontend correctly:
+
+- `FRONTEND_LLM_GUIDE.md`
+- `FRONTEND_LLM_PROMPT.md`
+
+These files should be reused instead of re-explaining the backend every time frontend generation is requested.
+
+Use them whenever:
+
+- another model is asked to generate admin frontend
+- another model is asked to generate app-side order pages
+
+---
+
+## 9. Recommended Next Work
+
+At this point, the project should not immediately expand endlessly into new modules.
+
+The most natural next work is:
+
+### Priority 1: Real compilation and run verification
+
+This is the highest-value next step.
+
+Recommended:
+
+1. create a fresh database
+2. run `sql/init-rbac.sql`
+3. start the backend
+4. verify login
+5. verify Swagger
+6. verify core module APIs
+
+Reason:
+
+- many structural changes have already landed
+- the next highest-value work is no longer design, but reality-check
+
+### Priority 2: Integration / manual API verification
+
+Recommended verification scope:
+
+- auth
+- system management
+- food category
+- food item
+- food order
+- app order
+- order statistics
+- stock log
+
+### Priority 3: Inventory concurrency strengthening
+
+If the project is going beyond first-version demo / management usage, stock deduction should be hardened.
+
+### Priority 4: Optional cleanup
+
+Possible cleanup tasks:
+
+- clean remaining legacy comments
+- clean or remove demo/test code
+- expand `BizErrorCode` usage into any leftover test/demo places
+
+---
+
+## 10. Recommended Reading Order For A New Assistant
+
+If a future assistant continues this project, the best reading order is:
+
+1. this handoff file
+2. `README.md`
+3. `sql/init-rbac.sql`
+4. `common/result`, `common/page`, `common/exception`
+5. `config/security`
+6. `modules/auth`
+7. `modules/system`
+8. `modules/food/category`
+9. `modules/food/item`
+10. `modules/food/order`
+11. `modules/food/stock`
+
+This reading order matches the actual dependency direction of the project.
+
+---
+
 ## 11. Notes For The Next Assistant
 
-When continuing from this project, please keep these constraints in mind:
-- do not re-architect auth unless necessary
-- keep current multi-token strategy for now
-- Redis should be introduced later, not immediately forced in
-- prefer continuing the current DTO + Service + Controller style
-- keep stable identifiers non-editable for now:
+When continuing from this project, keep the following in mind:
+
+- do not go back and redesign pagination; it is already complete
+- do not re-add Swagger; it already exists
+- do not redesign RBAC from scratch
+- do not remove current multi-token behavior unless explicitly requested
+- do not casually change stable identifiers:
   - username
   - roleCode
   - permCode
-- preserve current built-in protection rules around `admin`, `ADMIN`, and `admin:dashboard`
-- detail endpoints still intentionally reuse list permissions for now; this is a deliberate temporary decision, not an immediate bug to "fix"
-- Swagger is already working; do not spend the next chat re-adding it unless the code on disk no longer contains it
-- the user prefers step-by-step teaching collaboration
-- do not immediately take over and mass-edit files unless explicitly requested
-- prefer checking current code state first, then guiding one small change at a time
+- keep SQL permission codes aligned with controller permissions
+- treat `sql/init-rbac.sql` as the current initialization source of truth
+- use `FRONTEND_LLM_GUIDE.md` and `FRONTEND_LLM_PROMPT.md` for frontend-generation tasks
+- the next valuable phase is verification and hardening, not blind module expansion
+
+If a next conversation starts with "continue", the best default continuation is:
+
+1. verify compile / run / SQL init
+2. verify key APIs
+3. then fix any real runtime issues found
+
+---
 
 ## 12. Short Summary
 
 Current state:
-- RBAC foundation is already usable
-- system management modules are mostly built
-- user / role / permission list pagination are all now implemented
-- a round of management consistency fixes has already been applied
-- Swagger / OpenAPI has been added and manually verified to work
-- detail endpoints still intentionally reuse list permissions for now
-- the clearest next module is now `food_category`
-- business modules have not really started yet beyond SQL design
 
+- backend foundation is complete
+- system management is complete enough for first-version use
+- food business modules are already implemented
+- order and stock log chain is already connected
+- initialization SQL has been updated to match the current backend
+- frontend guidance docs have already been added
 
+The project has now reached a good handoff point.
+
+The next phase should be:
+
+- real validation
+- runtime correction
+- then selective hardening
