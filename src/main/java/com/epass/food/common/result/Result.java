@@ -1,5 +1,10 @@
 package com.epass.food.common.result;
 
+import lombok.Getter;
+import lombok.Setter;
+
+@Setter
+@Getter
 public class Result<T> {
 
     private Integer code;
@@ -27,27 +32,4 @@ public class Result<T> {
         return new Result<>(resultCode.getCode(), resultCode.getMessage(), null);
     }
 
-    public Integer getCode() {
-        return code;
-    }
-
-    public void setCode(Integer code) {
-        this.code = code;
-    }
-
-    public String getMessage() {
-        return message;
-    }
-
-    public void setMessage(String message) {
-        this.message = message;
-    }
-
-    public T getData() {
-        return data;
-    }
-
-    public void setData(T data) {
-        this.data = data;
-    }
 }

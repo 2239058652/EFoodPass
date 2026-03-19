@@ -10,6 +10,7 @@ import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.jspecify.annotations.NonNull;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -44,12 +45,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     /**
-     * 获取请求中的 JWT token，并解析，设置用户认证信息
+     * 获取请求中的 JWT token，并解析，查找数据库，设置用户认证信息
      */
     @Override
-    protected void doFilterInternal(HttpServletRequest request,
-                                    HttpServletResponse response,
-                                    FilterChain filterChain) throws ServletException, IOException {
+    protected void doFilterInternal(@NonNull HttpServletRequest request,
+                                    @NonNull HttpServletResponse response,
+                                    @NonNull FilterChain filterChain) throws ServletException, IOException {
 
         String token = resolveToken(request);
 
@@ -59,11 +60,12 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Long userId = Long.valueOf(claims.getSubject());
                 Integer tokenVersion = claims.get("tokenVersion", Integer.class);
 
+                // 1. 获取用户信息
                 SysUser user = sysUserService.getById(userId);
                 if (user != null && Integer.valueOf(1).equals(user.getStatus())
                         && user.getTokenVersion().equals(tokenVersion)) {
 
-                    // 先准备一个空列表，用来装“Security 能识别的角色标签
+                    // 2. 获取用户角色列表
                     List<SysRole> roleList = sysRoleService.getRolesByUserId(userId);
 
                     // 遍历角色列表，将角色标签装入 authorities 列表
@@ -72,6 +74,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                         authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getRoleCode()));
                     }
 
+                    // 3. 获取用户权限列表
                     List<String> permissionCodes = sysPermissionService.getPermissionCodesByUserId(userId);
                     for (String permissionCode : permissionCodes) {
                         authorities.add(new SimpleGrantedAuthority(permissionCode));
@@ -82,6 +85,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(loginUser, null, authorities);
 
+                    // 设置用户认证信息 到 SecurityContextHolder 中
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             } catch (Exception e) {

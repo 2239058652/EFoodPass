@@ -477,9 +477,9 @@ EFoodPass 是一个基于 Spring Boot 3、Spring Security、MyBatis-Plus、MySQL
 接手时要注意：
 
 - 当前库存日志主要覆盖：
-  - 下单扣减
-  - 取消回补
-  - 后台手工调整
+    - 下单扣减
+    - 取消回补
+    - 后台手工调整
 
 ---
 
@@ -775,3 +775,7 @@ EFoodPass 是一个基于 Spring Boot 3、Spring Security、MyBatis-Plus、MySQL
 3. 最后顺着“分类 -> 菜品 -> 订单 -> 库存日志”的链路看业务
 
 这样你会更快明白这套系统，而不是陷在局部代码里。
+
+### 20. 启动redis
+
+cd "C:\Program Files\Redis-3.0.504"; .\redis-server.exe

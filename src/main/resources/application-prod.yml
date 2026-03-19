@@ -50,3 +50,9 @@ auth:
   jwt:
     secret: dc0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef
     expire-seconds: 7200
+
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
