@@ -25,7 +25,8 @@ public class AiChatServiceImpl implements AiChatService {
 
     @Override
     public AiChatResponse chat(String message) {
-        String systemPrompt = buildPromptByMessage(message);
+        boolean orderQuestion = isOrderQuestion(message);
+        String systemPrompt = buildPromptByMessage(message, orderQuestion);
 
         String content = chatClient.prompt()
                 .system(systemPrompt)
@@ -33,11 +34,14 @@ public class AiChatServiceImpl implements AiChatService {
                 .call()
                 .content();
 
-        return new AiChatResponse(content);
+        String scene = orderQuestion ? "order" : "general";
+        boolean grounded = true;
+
+        return new AiChatResponse(content, scene, grounded);
     }
 
-    private String buildPromptByMessage(String message) {
-        if (isOrderQuestion(message)) {
+    private String buildPromptByMessage(String message, boolean orderQuestion) {
+        if (orderQuestion) {
             return """
                     %s
                     
