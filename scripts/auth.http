@@ -256,3 +256,11 @@ Authorization: Bearer {{adminToken}}
 ### 食物分类删除
 DELETE {{baseUrl}}/food/category/1
 Authorization: Bearer {{adminToken}}
+
+### AI 接口
+POST {{baseUrl}}/ai/chat
+Content-Type: application/json
+
+{
+  "message": "你好，请用一句话介绍你自己"
+}
