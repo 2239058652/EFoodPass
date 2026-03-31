@@ -1,12 +1,15 @@
 package com.epass.food.modules.ai.service.impl;
 
+import com.epass.food.common.exception.BusinessException;
 import com.epass.food.modules.ai.dto.AiChatResponse;
+import com.epass.food.modules.ai.dto.AiStructuredReply;
 import com.epass.food.modules.ai.service.AiChatService;
 import com.epass.food.modules.ai.service.BusinessContextProvider;
 import com.epass.food.modules.ai.service.OrderFactProvider;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
-
 
 @Service
 public class AiChatServiceImpl implements AiChatService {
@@ -14,13 +17,16 @@ public class AiChatServiceImpl implements AiChatService {
     private final ChatClient chatClient;
     private final BusinessContextProvider businessContextProvider;
     private final OrderFactProvider orderFactProvider;
+    private final ObjectMapper objectMapper;
 
     public AiChatServiceImpl(ChatClient.Builder chatClientBuilder,
                              BusinessContextProvider businessContextProvider,
-                             OrderFactProvider orderFactProvider) {
+                             OrderFactProvider orderFactProvider,
+                             ObjectMapper objectMapper) {
         this.chatClient = chatClientBuilder.build();
         this.businessContextProvider = businessContextProvider;
         this.orderFactProvider = orderFactProvider;
+        this.objectMapper = objectMapper;
     }
 
     @Override
@@ -28,16 +34,27 @@ public class AiChatServiceImpl implements AiChatService {
         boolean orderQuestion = isOrderQuestion(message);
         String systemPrompt = buildPromptByMessage(message, orderQuestion);
 
-        String content = chatClient.prompt()
+        String rawContent = chatClient.prompt()
                 .system(systemPrompt)
                 .user(message)
                 .call()
                 .content();
 
-        String scene = orderQuestion ? "order" : "general";
-        boolean grounded = true;
+        AiStructuredReply reply = parseStructuredReply(rawContent);
 
-        return new AiChatResponse(content, scene, grounded);
+        return new AiChatResponse(
+                reply.getContent(),
+                reply.getScene(),
+                reply.getGrounded()
+        );
+    }
+
+    private AiStructuredReply parseStructuredReply(String rawContent) {
+        try {
+            return objectMapper.readValue(rawContent, AiStructuredReply.class);
+        } catch (JsonProcessingException e) {
+            throw new BusinessException(500, "AI 返回结果不是合法 JSON: " + rawContent);
+        }
     }
 
     private String buildPromptByMessage(String message, boolean orderQuestion) {
@@ -51,13 +68,31 @@ public class AiChatServiceImpl implements AiChatService {
                     你现在是 EFoodPass 的订单助手。
                     请严格基于这些真实事实回答订单问题。
                     如果事实里没有，不要编造。
+                    
+                    你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
+                    JSON 格式如下：
+                    {
+                      "content": "给用户的中文回答",
+                      "scene": "order",
+                      "grounded": true
+                    }
                     """.formatted(
                     businessContextProvider.buildCommonFacts(),
                     orderFactProvider.buildOrderFacts()
             );
         }
 
-        return businessContextProvider.buildGeneralAssistantPrompt();
+        return """
+                %s
+                
+                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
+                JSON 格式如下：
+                {
+                  "content": "给用户的中文回答",
+                  "scene": "general",
+                  "grounded": true
+                }
+                """.formatted(businessContextProvider.buildGeneralAssistantPrompt());
     }
 
     private boolean isOrderQuestion(String message) {
