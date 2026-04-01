@@ -7,9 +7,11 @@ import lombok.Data;
 @AllArgsConstructor
 public class AiChatResponse {
 
-    private String content; // AI 回复内容
+    private String content;
 
-    private String scene; // 本次问题属于哪个场景，比如 order 或 general
+    private String scene;
 
-    private Boolean grounded; // 这次回答是否明确基于项目事实
+    private Boolean grounded;
+
+    private String nextAction;
 }

@@ -1,18 +1,23 @@
 package com.epass.food.modules.ai.service;
 
+import com.epass.food.modules.food.order.enums.FoodOrderStatus;
 import org.springframework.stereotype.Component;
+
+import java.util.Arrays;
+import java.util.stream.Collectors;
 
 @Component
 public class OrderFactProvider {
 
     public String buildOrderStatusFacts() {
+        String statusLines = Arrays.stream(FoodOrderStatus.values())
+                .map(status -> "- %d：%s".formatted(status.getCode(), status.getLabel()))
+                .collect(Collectors.joining("\n"));
+
         return """
                 当前系统中的真实订单状态如下：
-                - 10：待确认
-                - 20：制作中
-                - 30：已完成
-                - 40：已取消
-                """;
+                %s
+                """.formatted(statusLines);
     }
 
     public String buildOrderRulesFacts() {

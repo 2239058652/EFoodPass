@@ -10,20 +10,10 @@ import com.epass.food.modules.food.category.entity.FoodCategory;
 import com.epass.food.modules.food.category.mapper.FoodCategoryMapper;
 import com.epass.food.modules.food.item.entity.FoodItem;
 import com.epass.food.modules.food.item.mapper.FoodItemMapper;
-import com.epass.food.modules.food.order.dto.AppOrderCreateRequest;
-import com.epass.food.modules.food.order.dto.FoodOrderCreateRequest;
-import com.epass.food.modules.food.order.dto.FoodOrderDetailResponse;
-import com.epass.food.modules.food.order.dto.FoodOrderItemRequest;
-import com.epass.food.modules.food.order.dto.FoodOrderItemResponse;
-import com.epass.food.modules.food.order.dto.FoodOrderListQuery;
-import com.epass.food.modules.food.order.dto.FoodOrderListResponse;
-import com.epass.food.modules.food.order.dto.FoodOrderUpdateStatusRequest;
-import com.epass.food.modules.food.order.dto.OrderDailyAmountResponse;
-import com.epass.food.modules.food.order.dto.OrderStatOverviewResponse;
-import com.epass.food.modules.food.order.dto.OrderStatusCountResponse;
-import com.epass.food.modules.food.order.dto.OrderTopItemResponse;
+import com.epass.food.modules.food.order.dto.*;
 import com.epass.food.modules.food.order.entity.FoodOrder;
 import com.epass.food.modules.food.order.entity.FoodOrderItem;
+import com.epass.food.modules.food.order.enums.FoodOrderStatus;
 import com.epass.food.modules.food.order.mapper.FoodOrderItemMapper;
 import com.epass.food.modules.food.order.mapper.FoodOrderMapper;
 import com.epass.food.modules.food.order.service.FoodOrderService;
@@ -37,20 +27,12 @@ import org.springframework.util.StringUtils;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
 public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder> implements FoodOrderService {
 
-    private static final int ORDER_STATUS_PENDING = 10;
-    private static final int ORDER_STATUS_PROCESSING = 20;
-    private static final int ORDER_STATUS_COMPLETED = 30;
-    private static final int ORDER_STATUS_CANCELED = 40;
 
     private final FoodOrderItemMapper foodOrderItemMapper;
     private final FoodItemMapper foodItemMapper;
@@ -71,10 +53,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     }
 
     private void validateOrderStatus(Integer orderStatus) {
-        if (!Integer.valueOf(ORDER_STATUS_PENDING).equals(orderStatus)
-                && !Integer.valueOf(ORDER_STATUS_PROCESSING).equals(orderStatus)
-                && !Integer.valueOf(ORDER_STATUS_COMPLETED).equals(orderStatus)
-                && !Integer.valueOf(ORDER_STATUS_CANCELED).equals(orderStatus)) {
+        if (!FoodOrderStatus.isValid(orderStatus)) {
             throw new BusinessException(BizErrorCode.ORDER_STATUS_INVALID, "订单状态值不合法");
         }
     }
@@ -260,7 +239,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         order.setOrderNo(generateOrderNo());
         order.setUserId(request.getUserId());
         order.setTotalAmount(totalAmount);
-        order.setOrderStatus(ORDER_STATUS_PENDING);
+        order.setOrderStatus(FoodOrderStatus.PENDING.getCode());
         order.setRemark(request.getRemark());
 
         this.save(order);
@@ -287,11 +266,11 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     public void processOrder(FoodOrderUpdateStatusRequest request) {
         FoodOrder order = getRequiredOrder(request.getOrderId());
 
-        if (!Integer.valueOf(ORDER_STATUS_PENDING).equals(order.getOrderStatus())) {
+        if (!Integer.valueOf(FoodOrderStatus.PENDING.getCode()).equals(order.getOrderStatus())) {
             throw new BusinessException(BizErrorCode.ORDER_ONLY_PENDING_CAN_PROCESS, "只有待确认订单才能开始制作");
         }
 
-        order.setOrderStatus(ORDER_STATUS_PROCESSING);
+        order.setOrderStatus(FoodOrderStatus.PROCESSING.getCode());
         this.updateById(order);
     }
 
@@ -300,11 +279,11 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     public void cancelOrder(FoodOrderUpdateStatusRequest request) {
         FoodOrder order = getRequiredOrder(request.getOrderId());
 
-        if (Integer.valueOf(ORDER_STATUS_COMPLETED).equals(order.getOrderStatus())) {
+        if (Integer.valueOf(FoodOrderStatus.COMPLETED.getCode()).equals(order.getOrderStatus())) {
             throw new BusinessException(BizErrorCode.ORDER_COMPLETED_CANNOT_CANCEL, "已完成订单不能取消");
         }
 
-        if (Integer.valueOf(ORDER_STATUS_CANCELED).equals(order.getOrderStatus())) {
+        if (Integer.valueOf(FoodOrderStatus.CANCELED.getCode()).equals(order.getOrderStatus())) {
             throw new BusinessException(BizErrorCode.ORDER_ALREADY_CANCELED, "订单已取消，请勿重复操作");
         }
 
@@ -330,7 +309,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
             );
         }
 
-        order.setOrderStatus(ORDER_STATUS_CANCELED);
+        order.setOrderStatus(FoodOrderStatus.CANCELED.getCode());
         this.updateById(order);
     }
 
@@ -338,11 +317,11 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     public void completeOrder(FoodOrderUpdateStatusRequest request) {
         FoodOrder order = getRequiredOrder(request.getOrderId());
 
-        if (!Integer.valueOf(ORDER_STATUS_PROCESSING).equals(order.getOrderStatus())) {
+        if (!Integer.valueOf(FoodOrderStatus.PROCESSING.getCode()).equals(order.getOrderStatus())) {
             throw new BusinessException(BizErrorCode.ORDER_ONLY_PROCESSING_CAN_COMPLETE, "只有制作中的订单才能完成");
         }
 
-        order.setOrderStatus(ORDER_STATUS_COMPLETED);
+        order.setOrderStatus(FoodOrderStatus.COMPLETED.getCode());
         this.updateById(order);
     }
 
@@ -398,16 +377,18 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
                 totalAmount = totalAmount.add(order.getTotalAmount());
             }
 
-            if (Integer.valueOf(ORDER_STATUS_PENDING).equals(order.getOrderStatus())) {
+            Integer orderStatus = order.getOrderStatus();
+
+            if (Integer.valueOf(FoodOrderStatus.PENDING.getCode()).equals(orderStatus)) {
                 pendingCount++;
-            } else if (Integer.valueOf(ORDER_STATUS_PROCESSING).equals(order.getOrderStatus())) {
+            } else if (Integer.valueOf(FoodOrderStatus.PROCESSING.getCode()).equals(orderStatus)) {
                 processingCount++;
-            } else if (Integer.valueOf(ORDER_STATUS_COMPLETED).equals(order.getOrderStatus())) {
+            } else if (Integer.valueOf(FoodOrderStatus.COMPLETED.getCode()).equals(orderStatus)) {
                 completedCount++;
                 if (order.getTotalAmount() != null) {
                     completedAmount = completedAmount.add(order.getTotalAmount());
                 }
-            } else if (Integer.valueOf(ORDER_STATUS_CANCELED).equals(order.getOrderStatus())) {
+            } else if (Integer.valueOf(FoodOrderStatus.CANCELED.getCode()).equals(orderStatus)) {
                 canceledCount++;
             }
         }
@@ -428,10 +409,9 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
         List<FoodOrder> orderList = this.list();
 
         Map<Integer, Long> countMap = new LinkedHashMap<>();
-        countMap.put(ORDER_STATUS_PENDING, 0L);
-        countMap.put(ORDER_STATUS_PROCESSING, 0L);
-        countMap.put(ORDER_STATUS_COMPLETED, 0L);
-        countMap.put(ORDER_STATUS_CANCELED, 0L);
+        for (FoodOrderStatus status : FoodOrderStatus.values()) {
+            countMap.put(status.getCode(), 0L);
+        }
 
         for (FoodOrder order : orderList) {
             Integer status = order.getOrderStatus();
@@ -455,7 +435,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     public List<OrderTopItemResponse> getTopSellingItems() {
         List<FoodOrder> completedOrders = this.list(
                 new LambdaQueryWrapper<FoodOrder>()
-                        .eq(FoodOrder::getOrderStatus, ORDER_STATUS_COMPLETED)
+                        .eq(FoodOrder::getOrderStatus, FoodOrderStatus.COMPLETED.getCode())
         );
         if (completedOrders.isEmpty()) {
             return new ArrayList<>();
@@ -495,7 +475,7 @@ public class FoodOrderServiceImpl extends ServiceImpl<FoodOrderMapper, FoodOrder
     public List<OrderDailyAmountResponse> getDailyAmounts() {
         List<FoodOrder> completedOrders = this.list(
                 new LambdaQueryWrapper<FoodOrder>()
-                        .eq(FoodOrder::getOrderStatus, ORDER_STATUS_COMPLETED)
+                        .eq(FoodOrder::getOrderStatus, FoodOrderStatus.COMPLETED.getCode())
                         .orderByAsc(FoodOrder::getCreatedAt)
         );
 

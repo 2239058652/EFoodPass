@@ -257,12 +257,20 @@ Authorization: Bearer {{adminToken}}
 DELETE {{baseUrl}}/food/category/1
 Authorization: Bearer {{adminToken}}
 
-###
+### AI 1
 POST http://localhost:5603/ai/chat
 Content-Type: application/json
 
 {
   "message": "订单状态有哪些？"
+}
+
+### AI 2
+POST {{baseUrl}}/ai/chat
+Content-Type: application/json
+
+{
+  "message": "这个系统有哪些模块？"
 }
 
 ### AI 接口
@@ -273,10 +281,52 @@ Content-Type: application/json
   "message": "取消订单后库存会怎样？"
 }
 
+
+
 ###
-POST {{baseUrl}}/ai/chat
+POST http://localhost:5603/ai/chat
 Content-Type: application/json
 
 {
-  "message": "这个系统有哪些模块？"
+  "message": "订单状态有哪些？"
+}
+
+###
+POST http://localhost:5603/ai/chat
+Content-Type: application/json
+
+{
+  "message": "菜品支持哪些操作？"
+}
+
+###
+POST http://localhost:5603/ai/chat
+Content-Type: application/json
+
+{
+  "message": "库存日志记录什么内容？"
+}
+
+###
+POST http://localhost:5603/ai/chat
+Content-Type: application/json
+
+{
+  "message": "系统是怎么做权限控制的？"
+}
+
+### 先测这个：
+POST http://localhost:5603/ai/chat
+Content-Type: application/json
+
+{
+  "message": "当前订单整体情况怎么样？"
+}
+
+### 再测这个：
+POST http://localhost:5603/ai/chat
+Content-Type: application/json
+
+{
+  "message": "现在已完成订单多吗？"
 }
