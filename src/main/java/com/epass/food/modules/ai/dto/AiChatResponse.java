@@ -14,4 +14,6 @@ public class AiChatResponse {
     private Boolean grounded;
 
     private String nextAction;
+
+    private String answerType;
 }

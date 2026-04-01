@@ -6,8 +6,4 @@ import lombok.Data;
 public class AiStructuredReply {
 
     private String content;
-
-    private String scene;
-
-    private Boolean grounded;
 }
