@@ -47,8 +47,10 @@ public class OrderAiSupportService {
         );
     }
 
-    public String buildOrderDetailFacts(Long orderId) {
-        var detail = foodOrderService.getOrderDetail(orderId);
+    public String buildOrderDetailFacts(Long currentUserId, boolean canViewAnyOrder, Long orderId) {
+        var detail = canViewAnyOrder
+                ? foodOrderService.getOrderDetail(orderId)
+                : foodOrderService.getCurrentUserOrderDetail(currentUserId, orderId);
 
         String itemSummary;
         if (detail.getItems() == null || detail.getItems().isEmpty()) {

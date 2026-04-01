@@ -53,9 +53,9 @@ public class AiChatServiceImpl implements AiChatService {
     }
 
     @Override
-    public AiChatResponse chat(String message) {
+    public AiChatResponse chat(String message, Long currentUserId, boolean canViewAnyOrder) {
         AiSceneType sceneType = aiSceneClassifier.classify(message);
-        String systemPrompt = buildPromptByScene(sceneType, message);
+        String systemPrompt = buildPromptByScene(sceneType, message, currentUserId, canViewAnyOrder);
 
         String rawContent = chatClient.prompt()
                 .system(systemPrompt)
@@ -82,9 +82,12 @@ public class AiChatServiceImpl implements AiChatService {
         }
     }
 
-    private String buildPromptByScene(AiSceneType sceneType, String message) {
+    private String buildPromptByScene(AiSceneType sceneType,
+                                      String message,
+                                      Long currentUserId,
+                                      boolean canViewAnyOrder) {
         return switch (sceneType) {
-            case ORDER -> buildOrderPrompt(message);
+            case ORDER -> buildOrderPrompt(message, currentUserId, canViewAnyOrder);
             case ITEM -> buildItemPrompt();
             case STOCK -> buildStockPrompt();
             case SYSTEM -> buildSystemPrompt();
@@ -133,18 +136,18 @@ public class AiChatServiceImpl implements AiChatService {
                 """.formatted(businessContextProvider.buildGeneralAssistantPrompt());
     }
 
-    private String buildOrderPrompt(String message) {
+    private String buildOrderPrompt(String message, Long currentUserId, boolean canViewAnyOrder) {
         OrderQuestionType questionType = orderQuestionClassifier.classify(message);
 
         return switch (questionType) {
-            case DETAIL_QUERY -> buildOrderDetailPrompt(message);
+            case DETAIL_QUERY -> buildOrderDetailPrompt(message, currentUserId, canViewAnyOrder);
             case STATUS_RULE -> buildOrderStatusPrompt();
             case REALTIME_STATS -> buildOrderRealtimePrompt();
             case GENERAL_ORDER -> buildOrderGeneralPrompt();
         };
     }
 
-    private String buildOrderDetailPrompt(String message) {
+    private String buildOrderDetailPrompt(String message, Long currentUserId, boolean canViewAnyOrder) {
         Long orderId = orderIdExtractor.extractOrderId(message);
         if (orderId == null) {
             return buildOrderGeneralPrompt();
@@ -156,7 +159,7 @@ public class AiChatServiceImpl implements AiChatService {
                 下面是订单领域的静态业务事实：
                 %s
                 
-                下面是指定订单的真实详情：
+                下面是当前用户有权访问的指定订单真实详情：
                 %s
                 
                 你现在是 EFoodPass 的订单助手。
@@ -173,7 +176,7 @@ public class AiChatServiceImpl implements AiChatService {
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
                 orderFactProvider.buildOrderFacts(),
-                orderAiSupportService.buildOrderDetailFacts(orderId)
+                orderAiSupportService.buildOrderDetailFacts(currentUserId, canViewAnyOrder, orderId)
         );
     }
 
