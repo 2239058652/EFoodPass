@@ -26,6 +26,7 @@ public class AiChatServiceImpl implements AiChatService {
 
     private final OrderAiSupportService orderAiSupportService;
     private final OrderQuestionClassifier orderQuestionClassifier;
+    private final OrderIdExtractor orderIdExtractor;
 
     public AiChatServiceImpl(ChatClient.Builder chatClientBuilder,
                              BusinessContextProvider businessContextProvider,
@@ -36,7 +37,8 @@ public class AiChatServiceImpl implements AiChatService {
                              OrderAiSupportService orderAiSupportService,
                              AiSceneClassifier aiSceneClassifier,
                              ObjectMapper objectMapper,
-                             OrderQuestionClassifier orderQuestionClassifier) {
+                             OrderQuestionClassifier orderQuestionClassifier,
+                             OrderIdExtractor orderIdExtractor) {
         this.chatClient = chatClientBuilder.build();
         this.businessContextProvider = businessContextProvider;
         this.orderFactProvider = orderFactProvider;
@@ -47,6 +49,7 @@ public class AiChatServiceImpl implements AiChatService {
         this.aiSceneClassifier = aiSceneClassifier;
         this.objectMapper = objectMapper;
         this.orderQuestionClassifier = orderQuestionClassifier;
+        this.orderIdExtractor = orderIdExtractor;
     }
 
     @Override
@@ -100,10 +103,13 @@ public class AiChatServiceImpl implements AiChatService {
     }
 
     private String resolveOrderAction(String message) {
-        if (message != null && message.contains("状态")) {
-            return "view_order_status";
-        }
-        return "view_order_module";
+        OrderQuestionType questionType = orderQuestionClassifier.classify(message);
+
+        return switch (questionType) {
+            case DETAIL_QUERY -> "view_order_detail";
+            case STATUS_RULE -> "view_order_status";
+            case REALTIME_STATS, GENERAL_ORDER -> "view_order_module";
+        };
     }
 
     private String resolveGeneralAction(String message) {
@@ -131,10 +137,44 @@ public class AiChatServiceImpl implements AiChatService {
         OrderQuestionType questionType = orderQuestionClassifier.classify(message);
 
         return switch (questionType) {
+            case DETAIL_QUERY -> buildOrderDetailPrompt(message);
             case STATUS_RULE -> buildOrderStatusPrompt();
             case REALTIME_STATS -> buildOrderRealtimePrompt();
             case GENERAL_ORDER -> buildOrderGeneralPrompt();
         };
+    }
+
+    private String buildOrderDetailPrompt(String message) {
+        Long orderId = orderIdExtractor.extractOrderId(message);
+        if (orderId == null) {
+            return buildOrderGeneralPrompt();
+        }
+
+        return """
+                %s
+                
+                下面是订单领域的静态业务事实：
+                %s
+                
+                下面是指定订单的真实详情：
+                %s
+                
+                你现在是 EFoodPass 的订单助手。
+                当前问题是在询问指定订单的详情，请严格基于这些真实事实回答。
+                如果事实里没有，不要编造。
+                
+                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
+                JSON 格式如下：
+                {
+                  "content": "给用户的中文回答",
+                  "scene": "order",
+                  "grounded": true
+                }
+                """.formatted(
+                businessContextProvider.buildCommonFacts(),
+                orderFactProvider.buildOrderFacts(),
+                orderAiSupportService.buildOrderDetailFacts(orderId)
+        );
     }
 
     private String buildItemPrompt() {

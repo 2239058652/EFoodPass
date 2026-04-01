@@ -6,9 +6,19 @@ import org.springframework.stereotype.Component;
 @Component
 public class OrderQuestionClassifier {
 
+    private final OrderIdExtractor orderIdExtractor;
+
+    public OrderQuestionClassifier(OrderIdExtractor orderIdExtractor) {
+        this.orderIdExtractor = orderIdExtractor;
+    }
+
     public OrderQuestionType classify(String message) {
         if (message == null || message.isBlank()) {
             return OrderQuestionType.GENERAL_ORDER;
+        }
+
+        if (orderIdExtractor.extractOrderId(message) != null) {
+            return OrderQuestionType.DETAIL_QUERY;
         }
 
         if (isRealtimeStatsQuestion(message)) {

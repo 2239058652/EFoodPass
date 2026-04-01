@@ -46,4 +46,43 @@ public class OrderAiSupportService {
                 statusSummary
         );
     }
+
+    public String buildOrderDetailFacts(Long orderId) {
+        var detail = foodOrderService.getOrderDetail(orderId);
+
+        String itemSummary;
+        if (detail.getItems() == null || detail.getItems().isEmpty()) {
+            itemSummary = "该订单没有菜品明细";
+        } else {
+            itemSummary = detail.getItems().stream()
+                    .map(item -> "%s x%s，小计 %s"
+                            .formatted(
+                                    item.getFoodNameSnapshot(),
+                                    item.getQuantity(),
+                                    item.getAmount()
+                            ))
+                    .collect(java.util.stream.Collectors.joining("；"));
+        }
+
+        return """
+                当前查询的订单真实详情如下：
+                1. 订单ID：%s
+                2. 订单编号：%s
+                3. 用户ID：%s
+                4. 订单状态：%s
+                5. 订单总金额：%s
+                6. 备注：%s
+                7. 下单时间：%s
+                8. 菜品明细：%s
+                """.formatted(
+                detail.getId(),
+                detail.getOrderNo(),
+                detail.getUserId(),
+                detail.getOrderStatus(),
+                detail.getTotalAmount(),
+                detail.getRemark() == null ? "无" : detail.getRemark(),
+                detail.getCreatedAt(),
+                itemSummary
+        );
+    }
 }
