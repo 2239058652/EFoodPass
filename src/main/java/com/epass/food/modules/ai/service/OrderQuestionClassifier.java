@@ -6,18 +6,19 @@ import org.springframework.stereotype.Component;
 @Component
 public class OrderQuestionClassifier {
 
-    private final OrderIdExtractor orderIdExtractor;
+    private final OrderEntityReferenceResolver orderEntityReferenceResolver;
 
-    public OrderQuestionClassifier(OrderIdExtractor orderIdExtractor) {
-        this.orderIdExtractor = orderIdExtractor;
+    public OrderQuestionClassifier(OrderEntityReferenceResolver orderEntityReferenceResolver) {
+        this.orderEntityReferenceResolver = orderEntityReferenceResolver;
     }
+
 
     public OrderQuestionType classify(String message) {
         if (message == null || message.isBlank()) {
             return OrderQuestionType.GENERAL_ORDER;
         }
 
-        if (orderIdExtractor.extractOrderId(message) != null) {
+        if (orderEntityReferenceResolver.resolve(message) != null) {
             return OrderQuestionType.DETAIL_QUERY;
         }
 

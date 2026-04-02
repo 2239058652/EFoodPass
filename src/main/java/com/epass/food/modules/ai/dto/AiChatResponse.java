@@ -16,4 +16,6 @@ public class AiChatResponse {
     private String nextAction;
 
     private String answerType;
+
+    private AiDisplayCard card;
 }

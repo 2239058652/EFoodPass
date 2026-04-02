@@ -87,4 +87,18 @@ public class OrderAiSupportService {
                 itemSummary
         );
     }
+
+    public com.epass.food.modules.food.order.dto.FoodOrderDetailResponse getAccessibleOrderDetail(
+            Long currentUserId,
+            boolean canViewAnyOrder,
+            Long orderId
+    ) {
+        return canViewAnyOrder
+                ? foodOrderService.getOrderDetail(orderId)
+                : foodOrderService.getCurrentUserOrderDetail(currentUserId, orderId);
+    }
+
+    public OrderStatOverviewResponse getOrderStatOverview() {
+        return foodOrderService.getOrderStatOverview();
+    }
 }

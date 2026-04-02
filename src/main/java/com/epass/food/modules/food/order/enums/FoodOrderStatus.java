@@ -34,4 +34,16 @@ public enum FoodOrderStatus {
                 .orElseThrow(() -> new IllegalArgumentException("未知订单状态: " + code));
     }
 
+    public static String getLabelByCode(Integer code) {
+        if (code == null) {
+            return "未知";
+        }
+
+        return Arrays.stream(values())
+                .filter(status -> status.code == code)
+                .map(FoodOrderStatus::getLabel)
+                .findFirst()
+                .orElse("未知");
+    }
+
 }
