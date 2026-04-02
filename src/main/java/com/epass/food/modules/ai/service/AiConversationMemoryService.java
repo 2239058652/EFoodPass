@@ -111,8 +111,8 @@ public class AiConversationMemoryService {
         List<ConversationTurn> turns = getAllTurns(userId, sessionId);
         List<AiConversationMessage> messages = new ArrayList<>();
         for (ConversationTurn turn : turns) {
-            messages.add(new AiConversationMessage("user", turn.userMessage()));
-            messages.add(new AiConversationMessage("assistant", turn.assistantMessage()));
+            messages.add(new AiConversationMessage("user", turn.userMessage(), turn.userCreatedAt()));
+            messages.add(new AiConversationMessage("assistant", turn.assistantMessage(), turn.assistantCreatedAt()));
         }
 
         return new AiConversationSessionDetail(
@@ -130,17 +130,24 @@ public class AiConversationMemoryService {
                            String sessionId,
                            AiSceneType sceneType,
                            String userMessage,
-                           String assistantMessage) {
+                           String assistantMessage,
+                           long userCreatedAt,
+                           long assistantCreatedAt) {
         String turnsKey = buildTurnsKey(userId, sessionId);
         String sceneKey = buildSceneKey(userId, sessionId);
         String summaryKey = buildSummaryKey(userId, sessionId);
         String sessionIndexKey = buildSessionIndexKey(userId);
         String sessionMetaKey = buildSessionMetaKey(userId, sessionId);
         Duration ttl = Duration.ofHours(properties.getTtlHours());
-        long now = System.currentTimeMillis();
 
+        ConversationTurn turn = new ConversationTurn(
+                userMessage,
+                assistantMessage,
+                userCreatedAt,
+                assistantCreatedAt
+        );
         stringRedisTemplate.opsForList()
-                .rightPush(turnsKey, serializeTurn(new ConversationTurn(userMessage, assistantMessage)));
+                .rightPush(turnsKey, serializeTurn(turn));
         stringRedisTemplate.opsForList().trim(turnsKey, -properties.getMaxTurns(), -1);
         stringRedisTemplate.expire(turnsKey, ttl);
 
@@ -157,10 +164,10 @@ public class AiConversationMemoryService {
                 title,
                 sceneType.name().toLowerCase(),
                 buildPreview(userMessage, assistantMessage),
-                now
+                assistantCreatedAt
         );
         stringRedisTemplate.opsForValue().set(sessionMetaKey, serializeSessionMeta(sessionSummary), ttl);
-        stringRedisTemplate.opsForZSet().add(sessionIndexKey, sessionId, now);
+        stringRedisTemplate.opsForZSet().add(sessionIndexKey, sessionId, assistantCreatedAt);
         stringRedisTemplate.expire(sessionIndexKey, ttl);
     }
 
@@ -364,6 +371,9 @@ public class AiConversationMemoryService {
     public record ConversationPromptContext(String summary, List<ConversationTurn> recentTurns) {
     }
 
-    public record ConversationTurn(String userMessage, String assistantMessage) {
+    public record ConversationTurn(String userMessage,
+                                   String assistantMessage,
+                                   Long userCreatedAt,
+                                   Long assistantCreatedAt) {
     }
 }

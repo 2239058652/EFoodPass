@@ -10,4 +10,6 @@ public class AiConversationMessage {
     private String role;
 
     private String content;
+
+    private Long createdAt;
 }

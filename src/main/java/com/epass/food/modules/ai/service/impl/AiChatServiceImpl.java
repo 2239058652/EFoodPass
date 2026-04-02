@@ -47,6 +47,7 @@ public class AiChatServiceImpl implements AiChatService {
     @Override
     public AiChatResponse chat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder) {
         String resolvedSessionId = conversationMemoryService.ensureSessionId(sessionId);
+        long userCreatedAt = System.currentTimeMillis();
         SceneResolution sceneResolution = resolveSceneType(message, currentUserId, resolvedSessionId);
         AiConversationMemoryService.ConversationPromptContext promptContext =
                 conversationMemoryService.getPromptContext(currentUserId, resolvedSessionId);
@@ -66,13 +67,16 @@ public class AiChatServiceImpl implements AiChatService {
                 .call()
                 .content();
 
+        long assistantCreatedAt = System.currentTimeMillis();
         AiStructuredReply reply = parseStructuredReply(rawContent);
         conversationMemoryService.appendTurn(
                 currentUserId,
                 resolvedSessionId,
                 sceneResolution.sceneType(),
                 message,
-                reply.getContent()
+                reply.getContent(),
+                userCreatedAt,
+                assistantCreatedAt
         );
 
         return new AiChatResponse(
