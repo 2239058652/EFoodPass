@@ -14,7 +14,7 @@ public interface AiChatService {
 
     List<AiConversationSessionSummary> listSessions(Long currentUserId, int limit);
 
-    AiConversationSessionDetail getSessionDetail(String sessionId, Long currentUserId);
+    AiConversationSessionDetail getSessionDetail(String sessionId, Long currentUserId, int pageNum, int pageSize);
 
     void renameSession(String sessionId, String title, Long currentUserId);
 }

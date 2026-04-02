@@ -105,8 +105,8 @@ public class AiChatServiceImpl implements AiChatService {
     }
 
     @Override
-    public AiConversationSessionDetail getSessionDetail(String sessionId, Long currentUserId) {
-        return conversationMemoryService.getSessionDetail(currentUserId, sessionId);
+    public AiConversationSessionDetail getSessionDetail(String sessionId, Long currentUserId, int pageNum, int pageSize) {
+        return conversationMemoryService.getSessionDetail(currentUserId, sessionId, pageNum, pageSize);
     }
 
     @Override

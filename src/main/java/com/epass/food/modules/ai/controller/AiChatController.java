@@ -60,9 +60,11 @@ public class AiChatController {
 
     @GetMapping("/session/{sessionId}")
     public Result<AiConversationSessionDetail> getSessionDetail(@PathVariable String sessionId,
+                                                                @RequestParam(defaultValue = "1") int pageNum,
+                                                                @RequestParam(defaultValue = "20") int pageSize,
                                                                 Authentication authentication) {
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
-        return Result.success(aiChatService.getSessionDetail(sessionId, loginUser.getUserId()));
+        return Result.success(aiChatService.getSessionDetail(sessionId, loginUser.getUserId(), pageNum, pageSize));
     }
 
     @PutMapping("/session/{sessionId}/title")

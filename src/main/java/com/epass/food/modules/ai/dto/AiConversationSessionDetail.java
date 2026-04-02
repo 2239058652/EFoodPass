@@ -21,5 +21,13 @@ public class AiConversationSessionDetail {
 
     private String summary;
 
+    private Long totalMessages;
+
+    private Integer pageNum;
+
+    private Integer pageSize;
+
+    private Boolean hasMore;
+
     private List<AiConversationMessage> messages;
 }
