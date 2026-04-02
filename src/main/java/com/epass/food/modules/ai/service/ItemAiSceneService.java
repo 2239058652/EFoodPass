@@ -6,6 +6,7 @@ import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiDisplayField;
 import com.epass.food.modules.ai.dto.AiEntityReference;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
+import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import com.epass.food.modules.ai.dto.ItemQuestionType;
 import com.epass.food.modules.food.item.enums.FoodItemSaleStatus;
@@ -41,11 +42,11 @@ public class ItemAiSceneService implements AiSceneHandler {
     }
 
     @Override
-    public AiPromptPlan buildPlan(String message, Long currentUserId, boolean canViewAnyOrder) {
-        ItemQuestionType questionType = itemQuestionClassifier.classify(message);
+    public AiPromptPlan buildPlan(AiSceneRequestContext context) {
+        ItemQuestionType questionType = itemQuestionClassifier.classify(context.message());
 
         return switch (questionType) {
-            case DETAIL_QUERY -> buildDetailPlan(message);
+            case DETAIL_QUERY -> buildDetailPlan(context.message());
             case STATUS_RULE -> new AiPromptPlan(
                     buildStatusPrompt(),
                     AiAnswerType.NORMAL,

@@ -4,6 +4,7 @@ import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiDisplayField;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
+import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import org.springframework.stereotype.Service;
 
@@ -28,7 +29,7 @@ public class SystemAiSceneService implements AiSceneHandler {
     }
 
     @Override
-    public AiPromptPlan buildPlan(String message, Long currentUserId, boolean canViewAnyOrder) {
+    public AiPromptPlan buildPlan(AiSceneRequestContext context) {
         return new AiPromptPlan(
                 buildPrompt(),
                 AiAnswerType.NORMAL,

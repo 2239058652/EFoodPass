@@ -7,6 +7,7 @@ import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiDisplayField;
 import com.epass.food.modules.ai.dto.AiEntityReference;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
+import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import com.epass.food.modules.ai.dto.OrderQuestionType;
 import com.epass.food.modules.food.order.enums.FoodOrderStatus;
@@ -42,11 +43,11 @@ public class OrderAiSceneService implements AiSceneHandler {
     }
 
     @Override
-    public AiPromptPlan buildPlan(String message, Long currentUserId, boolean canViewAnyOrder) {
-        OrderQuestionType questionType = orderQuestionClassifier.classify(message);
+    public AiPromptPlan buildPlan(AiSceneRequestContext context) {
+        OrderQuestionType questionType = orderQuestionClassifier.classify(context.message());
 
         return switch (questionType) {
-            case DETAIL_QUERY -> buildDetailPlan(message, currentUserId, canViewAnyOrder);
+            case DETAIL_QUERY -> buildDetailPlan(context);
             case STATUS_RULE -> new AiPromptPlan(
                     buildStatusPrompt(),
                     AiAnswerType.NORMAL,
@@ -71,8 +72,8 @@ public class OrderAiSceneService implements AiSceneHandler {
         };
     }
 
-    private AiPromptPlan buildDetailPlan(String message, Long currentUserId, boolean canViewAnyOrder) {
-        AiEntityReference reference = orderEntityReferenceResolver.resolve(message);
+    private AiPromptPlan buildDetailPlan(AiSceneRequestContext context) {
+        AiEntityReference reference = orderEntityReferenceResolver.resolve(context.message());
         if (reference == null || reference.getEntityId() == null) {
             return new AiPromptPlan(
                     buildGeneralPrompt(),
@@ -85,8 +86,8 @@ public class OrderAiSceneService implements AiSceneHandler {
 
         try {
             String detailFacts = orderAiSupportService.buildOrderDetailFacts(
-                    currentUserId,
-                    canViewAnyOrder,
+                    context.currentUserId(),
+                    context.canViewAnyOrder(),
                     reference.getEntityId()
             );
 
@@ -118,11 +119,11 @@ public class OrderAiSceneService implements AiSceneHandler {
             );
 
             return new AiPromptPlan(
-                    prompt,
-                    AiAnswerType.NORMAL,
-                    true,
-                    resolveDetailAction(reference),
-                    buildDetailCard(reference, currentUserId, canViewAnyOrder)
+                prompt,
+                AiAnswerType.NORMAL,
+                true,
+                resolveDetailAction(reference),
+                buildDetailCard(reference, context.currentUserId(), context.canViewAnyOrder())
             );
         } catch (BusinessException e) {
             AiAnswerType answerType = resolveAnswerType(e);

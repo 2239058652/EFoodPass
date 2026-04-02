@@ -3,6 +3,7 @@ package com.epass.food.modules.ai.service;
 import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
+import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import org.springframework.stereotype.Service;
 
@@ -23,7 +24,7 @@ public class GeneralAiSceneService implements AiSceneHandler {
     }
 
     @Override
-    public AiPromptPlan buildPlan(String message, Long currentUserId, boolean canViewAnyOrder) {
+    public AiPromptPlan buildPlan(AiSceneRequestContext context) {
         return new AiPromptPlan(
                 """
                         %s
@@ -33,10 +34,10 @@ public class GeneralAiSceneService implements AiSceneHandler {
                         {
                           "content": "给用户的中文回答"
                         }
-                        """.formatted(businessContextProvider.buildGeneralAssistantPrompt()),
+                """.formatted(businessContextProvider.buildGeneralAssistantPrompt()),
                 AiAnswerType.NORMAL,
                 true,
-                resolveAction(message),
+                resolveAction(context.message()),
                 new AiDisplayCard("通用助手", "general", "已基于当前项目通用事实生成回答。", List.of())
         );
     }

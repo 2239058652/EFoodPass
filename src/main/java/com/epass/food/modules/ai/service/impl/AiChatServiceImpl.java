@@ -4,6 +4,7 @@ import com.epass.food.common.exception.BusinessException;
 import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiChatResponse;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
+import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import com.epass.food.modules.ai.dto.AiStructuredReply;
 import com.epass.food.modules.ai.service.AiChatService;
@@ -38,8 +39,9 @@ public class AiChatServiceImpl implements AiChatService {
 
     @Override
     public AiChatResponse chat(String message, Long currentUserId, boolean canViewAnyOrder) {
+        AiSceneRequestContext context = new AiSceneRequestContext(message, currentUserId, canViewAnyOrder);
         AiSceneType sceneType = aiSceneClassifier.classify(message);
-        AiPromptPlan promptPlan = buildPromptByScene(sceneType, message, currentUserId, canViewAnyOrder);
+        AiPromptPlan promptPlan = buildPromptByScene(sceneType, context);
 
         String rawContent = chatClient.prompt()
                 .system(promptPlan.prompt())
@@ -58,15 +60,12 @@ public class AiChatServiceImpl implements AiChatService {
         );
     }
 
-    private AiPromptPlan buildPromptByScene(AiSceneType sceneType,
-                                            String message,
-                                            Long currentUserId,
-                                            boolean canViewAnyOrder) {
+    private AiPromptPlan buildPromptByScene(AiSceneType sceneType, AiSceneRequestContext context) {
         AiSceneHandler sceneHandler = sceneHandlerMap.get(sceneType);
         if (sceneHandler == null) {
             throw new BusinessException(500, "未找到 AI 场景处理器: " + sceneType);
         }
-        return sceneHandler.buildPlan(message, currentUserId, canViewAnyOrder);
+        return sceneHandler.buildPlan(context);
     }
 
     private AiStructuredReply parseStructuredReply(String rawContent) {
