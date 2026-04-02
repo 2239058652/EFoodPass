@@ -1,7 +1,6 @@
 package com.epass.food.modules.ai.service.impl;
 
 import com.epass.food.common.exception.BusinessException;
-import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiChatResponse;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiSceneRequestContext;
@@ -9,8 +8,8 @@ import com.epass.food.modules.ai.dto.AiSceneType;
 import com.epass.food.modules.ai.dto.AiStructuredReply;
 import com.epass.food.modules.ai.service.AiChatService;
 import com.epass.food.modules.ai.service.AiConversationMemoryService;
-import com.epass.food.modules.ai.service.AiSceneHandler;
 import com.epass.food.modules.ai.service.AiSceneClassifier;
+import com.epass.food.modules.ai.service.AiSceneHandler;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
@@ -45,7 +44,12 @@ public class AiChatServiceImpl implements AiChatService {
     public AiChatResponse chat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder) {
         String resolvedSessionId = conversationMemoryService.ensureSessionId(sessionId);
         AiSceneType sceneType = resolveSceneType(message, currentUserId, resolvedSessionId);
-        AiSceneRequestContext context = new AiSceneRequestContext(message, resolvedSessionId, currentUserId, canViewAnyOrder);
+        AiSceneRequestContext context = new AiSceneRequestContext(
+                message,
+                resolvedSessionId,
+                currentUserId,
+                canViewAnyOrder
+        );
         AiPromptPlan promptPlan = buildPromptByScene(sceneType, context);
         String promptWithHistory = appendConversationHistory(promptPlan.prompt(), currentUserId, resolvedSessionId);
 
@@ -105,16 +109,27 @@ public class AiChatServiceImpl implements AiChatService {
     }
 
     private String appendConversationHistory(String basePrompt, Long currentUserId, String sessionId) {
-        List<AiConversationMemoryService.ConversationTurn> turns =
-                conversationMemoryService.getRecentTurns(currentUserId, sessionId, 3);
-        if (turns.isEmpty()) {
+        AiConversationMemoryService.ConversationPromptContext promptContext =
+                conversationMemoryService.getPromptContext(currentUserId, sessionId);
+
+        boolean hasSummary = promptContext.summary() != null && !promptContext.summary().isBlank();
+        boolean hasRecentTurns = !promptContext.recentTurns().isEmpty();
+        if (!hasSummary && !hasRecentTurns) {
             return basePrompt;
         }
 
         StringBuilder historyBuilder = new StringBuilder();
-        historyBuilder.append("\n\n下面是最近的对话上下文，仅用于帮助理解当前问题：\n");
+        historyBuilder.append("\n\n下面是与当前会话相关的上下文，仅用于辅助理解当前问题：\n");
+        if (hasSummary) {
+            historyBuilder.append(promptContext.summary()).append("\n");
+        }
+
+        if (hasRecentTurns) {
+            historyBuilder.append("最近几轮对话：\n");
+        }
+
         int index = 1;
-        for (AiConversationMemoryService.ConversationTurn turn : turns) {
+        for (AiConversationMemoryService.ConversationTurn turn : promptContext.recentTurns()) {
             historyBuilder.append(index)
                     .append(". 用户：")
                     .append(turn.userMessage())
@@ -125,7 +140,8 @@ public class AiChatServiceImpl implements AiChatService {
                     .append("\n");
             index++;
         }
-        historyBuilder.append("回答当前问题时优先看本轮问题，如果历史上下文与本轮冲突，以本轮为准。");
+
+        historyBuilder.append("回答当前问题时优先依据本轮问题；如果历史上下文与本轮冲突，以本轮为准。");
         return basePrompt + historyBuilder;
     }
 
