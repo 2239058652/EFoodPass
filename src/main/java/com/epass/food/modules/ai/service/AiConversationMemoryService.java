@@ -1,5 +1,6 @@
 package com.epass.food.modules.ai.service;
 
+import com.epass.food.common.exception.BusinessException;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -17,6 +18,8 @@ import java.util.UUID;
 
 @Service
 public class AiConversationMemoryService {
+
+    private static final int MAX_TITLE_LENGTH = 32;
 
     private final StringRedisTemplate stringRedisTemplate;
     private final ObjectMapper objectMapper;
@@ -113,8 +116,14 @@ public class AiConversationMemoryService {
         stringRedisTemplate.opsForValue().set(sceneKey, sceneType.name(), ttl);
         refreshSummary(turnsKey, summaryKey, ttl);
 
+        AiConversationSessionSummary existingSummary = readSessionMeta(userId, sessionId);
+        String title = existingSummary != null
+                ? existingSummary.getTitle()
+                : buildInitialTitle(userMessage, sceneType);
+
         AiConversationSessionSummary sessionSummary = new AiConversationSessionSummary(
                 sessionId,
+                title,
                 sceneType.name().toLowerCase(),
                 buildPreview(userMessage, assistantMessage),
                 now
@@ -122,6 +131,34 @@ public class AiConversationMemoryService {
         stringRedisTemplate.opsForValue().set(sessionMetaKey, serializeSessionMeta(sessionSummary), ttl);
         stringRedisTemplate.opsForZSet().add(sessionIndexKey, sessionId, now);
         stringRedisTemplate.expire(sessionIndexKey, ttl);
+    }
+
+    public void renameSession(Long userId, String sessionId, String title) {
+        if (userId == null || !StringUtils.hasText(sessionId)) {
+            throw new BusinessException(400, "sessionId 不能为空");
+        }
+        if (!StringUtils.hasText(title)) {
+            throw new BusinessException(400, "title 不能为空");
+        }
+
+        AiConversationSessionSummary existingSummary = readSessionMeta(userId, sessionId);
+        if (existingSummary == null) {
+            throw new BusinessException(404, "会话不存在");
+        }
+
+        AiConversationSessionSummary renamedSummary = new AiConversationSessionSummary(
+                existingSummary.getSessionId(),
+                normalizeTitle(title),
+                existingSummary.getScene(),
+                existingSummary.getPreview(),
+                existingSummary.getUpdatedAt()
+        );
+
+        stringRedisTemplate.opsForValue().set(
+                buildSessionMetaKey(userId, sessionId),
+                serializeSessionMeta(renamedSummary),
+                Duration.ofHours(properties.getTtlHours())
+        );
     }
 
     public void clearSession(Long userId, String sessionId) {
@@ -205,6 +242,24 @@ public class AiConversationMemoryService {
         }
 
         return summaryBuilder.toString();
+    }
+
+    private String buildInitialTitle(String userMessage, AiSceneType sceneType) {
+        String normalized = normalizeTitle(userMessage);
+        if (StringUtils.hasText(normalized)) {
+            return normalized;
+        }
+        return sceneType.name().toLowerCase() + " 对话";
+    }
+
+    private String normalizeTitle(String title) {
+        String normalized = title.replace("\r", " ")
+                .replace("\n", " ")
+                .trim();
+        if (normalized.length() <= MAX_TITLE_LENGTH) {
+            return normalized;
+        }
+        return normalized.substring(0, MAX_TITLE_LENGTH) + "...";
     }
 
     private String buildPreview(String userMessage, String assistantMessage) {

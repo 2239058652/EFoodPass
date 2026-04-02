@@ -9,6 +9,8 @@ public class AiConversationSessionSummary {
 
     private String sessionId;
 
+    private String title;
+
     private String scene;
 
     private String preview;

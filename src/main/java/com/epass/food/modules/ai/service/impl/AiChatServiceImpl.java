@@ -99,6 +99,11 @@ public class AiChatServiceImpl implements AiChatService {
         return conversationMemoryService.listSessions(currentUserId, limit);
     }
 
+    @Override
+    public void renameSession(String sessionId, String title, Long currentUserId) {
+        conversationMemoryService.renameSession(currentUserId, sessionId, title);
+    }
+
     private AiPromptPlan buildPromptByScene(AiSceneType sceneType, AiSceneRequestContext context) {
         AiSceneHandler sceneHandler = sceneHandlerMap.get(sceneType);
         if (sceneHandler == null) {
