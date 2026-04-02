@@ -19,6 +19,7 @@ import com.epass.food.modules.ai.service.AiAdvisorContextKeys;
 import com.epass.food.modules.ai.service.AiChatService;
 import com.epass.food.modules.ai.service.AiConversationMemoryAdvisor;
 import com.epass.food.modules.ai.service.AiConversationMemoryService;
+import com.epass.food.modules.ai.service.AiMetricsService;
 import com.epass.food.modules.ai.service.AiSceneClassifier;
 import com.epass.food.modules.ai.service.AiSceneHandler;
 import com.epass.food.modules.ai.service.AiStructuredOutputAdvisor;
@@ -51,23 +52,27 @@ public class AiChatServiceImpl implements AiChatService {
     private final Map<AiSceneType, AiSceneHandler> sceneHandlerMap;
     private final AiStructuredOutputAdvisor structuredOutputAdvisor;
     private final AiConversationMemoryAdvisor conversationMemoryAdvisor;
+    private final AiMetricsService aiMetricsService;
 
     public AiChatServiceImpl(ChatClient.Builder chatClientBuilder,
                              AiSceneClassifier aiSceneClassifier,
                              AiConversationMemoryService conversationMemoryService,
                              List<AiSceneHandler> sceneHandlers,
                              AiStructuredOutputAdvisor structuredOutputAdvisor,
-                             AiConversationMemoryAdvisor conversationMemoryAdvisor) {
+                             AiConversationMemoryAdvisor conversationMemoryAdvisor,
+                             AiMetricsService aiMetricsService) {
         this.chatClient = chatClientBuilder.build();
         this.aiSceneClassifier = aiSceneClassifier;
         this.conversationMemoryService = conversationMemoryService;
         this.sceneHandlerMap = buildSceneHandlerMap(sceneHandlers);
         this.structuredOutputAdvisor = structuredOutputAdvisor;
         this.conversationMemoryAdvisor = conversationMemoryAdvisor;
+        this.aiMetricsService = aiMetricsService;
     }
 
     @Override
     public AiChatResponse chat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder) {
+        long startedAt = System.currentTimeMillis();
         String resolvedSessionId = conversationMemoryService.ensureSessionId(sessionId);
         long userCreatedAt = System.currentTimeMillis();
 
@@ -106,7 +111,7 @@ public class AiChatServiceImpl implements AiChatService {
                 assistantCreatedAt
         );
 
-        return new AiChatResponse(
+        AiChatResponse response = new AiChatResponse(
                 resolvedSessionId,
                 reply.getContent(),
                 runtime.sceneResolution.sceneType().name().toLowerCase(),
@@ -119,10 +124,20 @@ public class AiChatServiceImpl implements AiChatService {
                 buildConversationMeta(runtime.promptContext, runtime.sceneResolution.reused()),
                 retrievalMeta
         );
+
+        aiMetricsService.recordChat(
+                response.getScene(),
+                response.getAnswerType(),
+                response.getToolStatus(),
+                response.getRetrieval(),
+                System.currentTimeMillis() - startedAt
+        );
+        return response;
     }
 
     @Override
     public Flux<AiChatStreamChunk> streamChat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder) {
+        long startedAt = System.currentTimeMillis();
         String resolvedSessionId = conversationMemoryService.ensureSessionId(sessionId);
         long userCreatedAt = System.currentTimeMillis();
 
@@ -146,15 +161,18 @@ public class AiChatServiceImpl implements AiChatService {
                 .content()
                 .doOnNext(assistantContent::append)
                 .map(delta -> new AiChatStreamChunk(resolvedSessionId, scene, delta, false))
-                .doOnComplete(() -> conversationMemoryService.appendTurn(
-                        currentUserId,
-                        resolvedSessionId,
-                        runtime.sceneResolution.sceneType(),
-                        message,
-                        assistantContent.toString(),
-                        userCreatedAt,
-                        System.currentTimeMillis()
-                ));
+                .doOnComplete(() -> {
+                    conversationMemoryService.appendTurn(
+                            currentUserId,
+                            resolvedSessionId,
+                            runtime.sceneResolution.sceneType(),
+                            message,
+                            assistantContent.toString(),
+                            userCreatedAt,
+                            System.currentTimeMillis()
+                    );
+                    aiMetricsService.recordStream(scene, System.currentTimeMillis() - startedAt);
+                });
         Flux<AiChatStreamChunk> suffix = Flux.just(new AiChatStreamChunk(resolvedSessionId, scene, "", true));
 
         return Flux.concat(prefix, contentFlux, suffix);

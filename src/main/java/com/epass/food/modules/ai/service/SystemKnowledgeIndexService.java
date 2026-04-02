@@ -15,16 +15,19 @@ public class SystemKnowledgeIndexService {
     private final VectorStore systemKnowledgeVectorStore;
     private final SystemKnowledgeDocumentFactory documentFactory;
     private final SystemKnowledgeRagProperties ragProperties;
+    private final AiMetricsService aiMetricsService;
 
     private volatile int documentCount;
     private volatile long lastRebuildAt;
 
     public SystemKnowledgeIndexService(VectorStore systemKnowledgeVectorStore,
                                        SystemKnowledgeDocumentFactory documentFactory,
-                                       SystemKnowledgeRagProperties ragProperties) {
+                                       SystemKnowledgeRagProperties ragProperties,
+                                       AiMetricsService aiMetricsService) {
         this.systemKnowledgeVectorStore = systemKnowledgeVectorStore;
         this.documentFactory = documentFactory;
         this.ragProperties = ragProperties;
+        this.aiMetricsService = aiMetricsService;
     }
 
     @PostConstruct
@@ -43,6 +46,7 @@ public class SystemKnowledgeIndexService {
 
         this.documentCount = documents.size();
         this.lastRebuildAt = System.currentTimeMillis();
+        aiMetricsService.recordKnowledgeRebuild(KNOWLEDGE_BASE, this.documentCount);
         return getStatus();
     }
 
