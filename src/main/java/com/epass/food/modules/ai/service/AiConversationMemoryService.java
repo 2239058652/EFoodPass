@@ -1,5 +1,6 @@
 package com.epass.food.modules.ai.service;
 
+import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -11,6 +12,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.UUID;
 
 @Service
@@ -72,6 +74,24 @@ public class AiConversationMemoryService {
         }
     }
 
+    public List<AiConversationSessionSummary> listSessions(Long userId, int limit) {
+        int resolvedLimit = Math.max(1, Math.min(limit, 20));
+        Set<String> sessionIds = stringRedisTemplate.opsForZSet()
+                .reverseRange(buildSessionIndexKey(userId), 0, resolvedLimit - 1);
+        if (sessionIds == null || sessionIds.isEmpty()) {
+            return List.of();
+        }
+
+        List<AiConversationSessionSummary> sessions = new ArrayList<>();
+        for (String sessionId : sessionIds) {
+            AiConversationSessionSummary summary = readSessionMeta(userId, sessionId);
+            if (summary != null) {
+                sessions.add(summary);
+            }
+        }
+        return sessions;
+    }
+
     public void appendTurn(Long userId,
                            String sessionId,
                            AiSceneType sceneType,
@@ -80,7 +100,10 @@ public class AiConversationMemoryService {
         String turnsKey = buildTurnsKey(userId, sessionId);
         String sceneKey = buildSceneKey(userId, sessionId);
         String summaryKey = buildSummaryKey(userId, sessionId);
+        String sessionIndexKey = buildSessionIndexKey(userId);
+        String sessionMetaKey = buildSessionMetaKey(userId, sessionId);
         Duration ttl = Duration.ofHours(properties.getTtlHours());
+        long now = System.currentTimeMillis();
 
         stringRedisTemplate.opsForList()
                 .rightPush(turnsKey, serializeTurn(new ConversationTurn(userMessage, assistantMessage)));
@@ -89,6 +112,16 @@ public class AiConversationMemoryService {
 
         stringRedisTemplate.opsForValue().set(sceneKey, sceneType.name(), ttl);
         refreshSummary(turnsKey, summaryKey, ttl);
+
+        AiConversationSessionSummary sessionSummary = new AiConversationSessionSummary(
+                sessionId,
+                sceneType.name().toLowerCase(),
+                buildPreview(userMessage, assistantMessage),
+                now
+        );
+        stringRedisTemplate.opsForValue().set(sessionMetaKey, serializeSessionMeta(sessionSummary), ttl);
+        stringRedisTemplate.opsForZSet().add(sessionIndexKey, sessionId, now);
+        stringRedisTemplate.expire(sessionIndexKey, ttl);
     }
 
     public void clearSession(Long userId, String sessionId) {
@@ -99,8 +132,10 @@ public class AiConversationMemoryService {
         stringRedisTemplate.delete(List.of(
                 buildTurnsKey(userId, sessionId),
                 buildSceneKey(userId, sessionId),
-                buildSummaryKey(userId, sessionId)
+                buildSummaryKey(userId, sessionId),
+                buildSessionMetaKey(userId, sessionId)
         ));
+        stringRedisTemplate.opsForZSet().remove(buildSessionIndexKey(userId), sessionId);
     }
 
     private String buildTurnsKey(Long userId, String sessionId) {
@@ -113,6 +148,14 @@ public class AiConversationMemoryService {
 
     private String buildSummaryKey(Long userId, String sessionId) {
         return "ai:conversation:" + userId + ":" + sessionId + ":summary";
+    }
+
+    private String buildSessionMetaKey(Long userId, String sessionId) {
+        return "ai:conversation:" + userId + ":" + sessionId + ":meta";
+    }
+
+    private String buildSessionIndexKey(Long userId) {
+        return "ai:conversation:" + userId + ":sessions";
     }
 
     private void refreshSummary(String turnsKey, String summaryKey, Duration ttl) {
@@ -164,6 +207,12 @@ public class AiConversationMemoryService {
         return summaryBuilder.toString();
     }
 
+    private String buildPreview(String userMessage, String assistantMessage) {
+        String userPreview = shorten(userMessage, 16);
+        String assistantPreview = shorten(assistantMessage, 20);
+        return "用户：" + userPreview + " | 助手：" + assistantPreview;
+    }
+
     private String shorten(String text, int maxLength) {
         if (!StringUtils.hasText(text)) {
             return "";
@@ -186,11 +235,32 @@ public class AiConversationMemoryService {
         }
     }
 
+    private String serializeSessionMeta(AiConversationSessionSummary summary) {
+        try {
+            return objectMapper.writeValueAsString(summary);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("序列化会话目录失败", e);
+        }
+    }
+
     private ConversationTurn deserializeTurn(String value) {
         try {
             return objectMapper.readValue(value, ConversationTurn.class);
         } catch (JsonProcessingException e) {
             throw new IllegalStateException("反序列化会话消息失败", e);
+        }
+    }
+
+    private AiConversationSessionSummary readSessionMeta(Long userId, String sessionId) {
+        String value = stringRedisTemplate.opsForValue().get(buildSessionMetaKey(userId, sessionId));
+        if (!StringUtils.hasText(value)) {
+            return null;
+        }
+
+        try {
+            return objectMapper.readValue(value, AiConversationSessionSummary.class);
+        } catch (JsonProcessingException e) {
+            throw new IllegalStateException("反序列化会话目录失败", e);
         }
     }
 
