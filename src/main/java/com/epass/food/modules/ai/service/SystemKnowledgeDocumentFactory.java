@@ -64,15 +64,21 @@ public class SystemKnowledgeDocumentFactory {
         return documents;
     }
 
+    public List<String> getDocumentIds() {
+        return createDocuments().stream().map(Document::getId).toList();
+    }
+
     private Document document(String id,
                               String title,
                               String content,
                               Map<String, Object> extraMetadata) {
-        Map<String, Object> metadata = new java.util.LinkedHashMap<>();
-        metadata.put("knowledgeBase", "system");
-        metadata.put("documentId", id);
-        metadata.put("title", title);
-        metadata.putAll(extraMetadata);
-        return new Document(content, metadata);
+        return Document.builder()
+                .id(id)
+                .text(content)
+                .metadata("knowledgeBase", "system")
+                .metadata("documentId", id)
+                .metadata("title", title)
+                .metadata(extraMetadata)
+                .build();
     }
 }

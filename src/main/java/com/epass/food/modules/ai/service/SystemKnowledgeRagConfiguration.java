@@ -12,11 +12,8 @@ import org.springframework.context.annotation.Configuration;
 public class SystemKnowledgeRagConfiguration {
 
     @Bean
-    public VectorStore systemKnowledgeVectorStore(EmbeddingModel embeddingModel,
-                                                  SystemKnowledgeDocumentFactory documentFactory) {
-        SimpleVectorStore vectorStore = SimpleVectorStore.builder(embeddingModel).build();
-        vectorStore.add(documentFactory.createDocuments());
-        return vectorStore;
+    public VectorStore systemKnowledgeVectorStore(EmbeddingModel embeddingModel) {
+        return SimpleVectorStore.builder(embeddingModel).build();
     }
 
     @Bean
