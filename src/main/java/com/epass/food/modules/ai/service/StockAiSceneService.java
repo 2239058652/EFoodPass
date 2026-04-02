@@ -4,10 +4,11 @@ import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiDisplayField;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
+import com.epass.food.modules.ai.dto.AiSceneType;
 import org.springframework.stereotype.Service;
 
 @Service
-public class StockAiSceneService {
+public class StockAiSceneService implements AiSceneHandler {
 
     private final BusinessContextProvider businessContextProvider;
     private final StockFactProvider stockFactProvider;
@@ -21,7 +22,13 @@ public class StockAiSceneService {
         this.stockChangeSceneCatalog = stockChangeSceneCatalog;
     }
 
-    public AiPromptPlan buildPlan() {
+    @Override
+    public AiSceneType sceneType() {
+        return AiSceneType.STOCK;
+    }
+
+    @Override
+    public AiPromptPlan buildPlan(String message, Long currentUserId, boolean canViewAnyOrder) {
         return new AiPromptPlan(
                 buildPrompt(),
                 AiAnswerType.NORMAL,

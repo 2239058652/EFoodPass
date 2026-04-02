@@ -6,6 +6,7 @@ import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiDisplayField;
 import com.epass.food.modules.ai.dto.AiEntityReference;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
+import com.epass.food.modules.ai.dto.AiSceneType;
 import com.epass.food.modules.ai.dto.ItemQuestionType;
 import com.epass.food.modules.food.item.enums.FoodItemSaleStatus;
 import org.springframework.stereotype.Service;
@@ -14,7 +15,7 @@ import java.util.Arrays;
 import java.util.List;
 
 @Service
-public class ItemAiSceneService {
+public class ItemAiSceneService implements AiSceneHandler {
 
     private final BusinessContextProvider businessContextProvider;
     private final ItemFactProvider itemFactProvider;
@@ -34,7 +35,13 @@ public class ItemAiSceneService {
         this.itemAiSupportService = itemAiSupportService;
     }
 
-    public AiPromptPlan buildPlan(String message) {
+    @Override
+    public AiSceneType sceneType() {
+        return AiSceneType.ITEM;
+    }
+
+    @Override
+    public AiPromptPlan buildPlan(String message, Long currentUserId, boolean canViewAnyOrder) {
         ItemQuestionType questionType = itemQuestionClassifier.classify(message);
 
         return switch (questionType) {

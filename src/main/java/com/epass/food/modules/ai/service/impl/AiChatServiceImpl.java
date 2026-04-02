@@ -3,53 +3,37 @@ package com.epass.food.modules.ai.service.impl;
 import com.epass.food.common.exception.BusinessException;
 import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiChatResponse;
-import com.epass.food.modules.ai.dto.AiDisplayCard;
-import com.epass.food.modules.ai.dto.AiDisplayField;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import com.epass.food.modules.ai.dto.AiStructuredReply;
 import com.epass.food.modules.ai.service.AiChatService;
+import com.epass.food.modules.ai.service.AiSceneHandler;
 import com.epass.food.modules.ai.service.AiSceneClassifier;
-import com.epass.food.modules.ai.service.BusinessContextProvider;
-import com.epass.food.modules.ai.service.ItemAiSceneService;
-import com.epass.food.modules.ai.service.OrderAiSceneService;
-import com.epass.food.modules.ai.service.StockAiSceneService;
-import com.epass.food.modules.ai.service.SystemAiSceneService;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
 
+import java.util.EnumMap;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class AiChatServiceImpl implements AiChatService {
 
     private final ChatClient chatClient;
-    private final BusinessContextProvider businessContextProvider;
     private final AiSceneClassifier aiSceneClassifier;
     private final ObjectMapper objectMapper;
-    private final OrderAiSceneService orderAiSceneService;
-    private final ItemAiSceneService itemAiSceneService;
-    private final StockAiSceneService stockAiSceneService;
-    private final SystemAiSceneService systemAiSceneService;
+    private final Map<AiSceneType, AiSceneHandler> sceneHandlerMap;
 
     public AiChatServiceImpl(ChatClient.Builder chatClientBuilder,
-                             BusinessContextProvider businessContextProvider,
                              AiSceneClassifier aiSceneClassifier,
                              ObjectMapper objectMapper,
-                             OrderAiSceneService orderAiSceneService,
-                             ItemAiSceneService itemAiSceneService,
-                             StockAiSceneService stockAiSceneService,
-                             SystemAiSceneService systemAiSceneService) {
+                             List<AiSceneHandler> sceneHandlers) {
         this.chatClient = chatClientBuilder.build();
-        this.businessContextProvider = businessContextProvider;
         this.aiSceneClassifier = aiSceneClassifier;
         this.objectMapper = objectMapper;
-        this.orderAiSceneService = orderAiSceneService;
-        this.itemAiSceneService = itemAiSceneService;
-        this.stockAiSceneService = stockAiSceneService;
-        this.systemAiSceneService = systemAiSceneService;
+        this.sceneHandlerMap = buildSceneHandlerMap(sceneHandlers);
     }
 
     @Override
@@ -78,19 +62,11 @@ public class AiChatServiceImpl implements AiChatService {
                                             String message,
                                             Long currentUserId,
                                             boolean canViewAnyOrder) {
-        return switch (sceneType) {
-            case ORDER -> orderAiSceneService.buildPlan(message, currentUserId, canViewAnyOrder);
-            case ITEM -> itemAiSceneService.buildPlan(message);
-            case STOCK -> stockAiSceneService.buildPlan();
-            case SYSTEM -> systemAiSceneService.buildPlan();
-            case GENERAL -> new AiPromptPlan(
-                    buildGeneralPrompt(),
-                    AiAnswerType.NORMAL,
-                    true,
-                    resolveGeneralAction(message),
-                    new AiDisplayCard("通用助手", "general", "已基于当前项目通用事实生成回答。", List.of())
-            );
-        };
+        AiSceneHandler sceneHandler = sceneHandlerMap.get(sceneType);
+        if (sceneHandler == null) {
+            throw new BusinessException(500, "未找到 AI 场景处理器: " + sceneType);
+        }
+        return sceneHandler.buildPlan(message, currentUserId, canViewAnyOrder);
     }
 
     private AiStructuredReply parseStructuredReply(String rawContent) {
@@ -101,22 +77,11 @@ public class AiChatServiceImpl implements AiChatService {
         }
     }
 
-    private String resolveGeneralAction(String message) {
-        if (message != null && message.contains("模块")) {
-            return "view_system_modules";
+    private Map<AiSceneType, AiSceneHandler> buildSceneHandlerMap(List<AiSceneHandler> sceneHandlers) {
+        Map<AiSceneType, AiSceneHandler> handlerMap = new EnumMap<>(AiSceneType.class);
+        for (AiSceneHandler sceneHandler : sceneHandlers) {
+            handlerMap.put(sceneHandler.sceneType(), sceneHandler);
         }
-        return "none";
-    }
-
-    private String buildGeneralPrompt() {
-        return """
-                %s
-
-                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                JSON 格式如下：
-                {
-                  "content": "给用户的中文回答"
-                }
-                """.formatted(businessContextProvider.buildGeneralAssistantPrompt());
+        return handlerMap;
     }
 }
