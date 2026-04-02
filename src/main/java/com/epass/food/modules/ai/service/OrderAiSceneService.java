@@ -1,7 +1,5 @@
 package com.epass.food.modules.ai.service;
 
-import com.epass.food.common.exception.BusinessException;
-import com.epass.food.common.result.BizErrorCode;
 import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiDisplayField;
@@ -15,26 +13,27 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class OrderAiSceneService implements AiSceneHandler {
 
     private final BusinessContextProvider businessContextProvider;
     private final OrderFactProvider orderFactProvider;
-    private final OrderAiSupportService orderAiSupportService;
     private final OrderQuestionClassifier orderQuestionClassifier;
     private final OrderEntityReferenceResolver orderEntityReferenceResolver;
+    private final OrderAiTools orderAiTools;
 
     public OrderAiSceneService(BusinessContextProvider businessContextProvider,
                                OrderFactProvider orderFactProvider,
-                               OrderAiSupportService orderAiSupportService,
                                OrderQuestionClassifier orderQuestionClassifier,
-                               OrderEntityReferenceResolver orderEntityReferenceResolver) {
+                               OrderEntityReferenceResolver orderEntityReferenceResolver,
+                               OrderAiTools orderAiTools) {
         this.businessContextProvider = businessContextProvider;
         this.orderFactProvider = orderFactProvider;
-        this.orderAiSupportService = orderAiSupportService;
         this.orderQuestionClassifier = orderQuestionClassifier;
         this.orderEntityReferenceResolver = orderEntityReferenceResolver;
+        this.orderAiTools = orderAiTools;
     }
 
     @Override
@@ -56,18 +55,25 @@ public class OrderAiSceneService implements AiSceneHandler {
                     buildStatusCard()
             );
             case REALTIME_STATS -> new AiPromptPlan(
-                    buildRealtimePrompt(),
+                    buildRealtimeToolPrompt(),
                     AiAnswerType.NORMAL,
                     true,
                     "view_order_module",
-                    buildStatsCard()
+                    buildRealtimeToolCard(),
+                    new Object[]{orderAiTools},
+                    buildToolContext(context)
             );
             case GENERAL_ORDER -> new AiPromptPlan(
                     buildGeneralPrompt(),
                     AiAnswerType.NORMAL,
                     true,
                     "view_order_module",
-                    new AiDisplayCard("订单助手", "order", "当前回答围绕订单领域的一般问题生成。", List.of())
+                    new AiDisplayCard(
+                            "订单助手",
+                            "order",
+                            "当前回答围绕订单领域的一般问题生成。",
+                            List.of()
+                    )
             );
         };
     }
@@ -80,84 +86,54 @@ public class OrderAiSceneService implements AiSceneHandler {
                     AiAnswerType.NORMAL,
                     true,
                     "ask_more_details",
-                    new AiDisplayCard("订单助手", "order", "未能从问题中提取订单编号。", List.of())
+                    new AiDisplayCard(
+                            "订单查询",
+                            "order-detail",
+                            "未能从问题中提取订单编号。",
+                            List.of()
+                    )
             );
         }
 
-        try {
-            String detailFacts = orderAiSupportService.buildOrderDetailFacts(
-                    context.currentUserId(),
-                    context.canViewAnyOrder(),
-                    reference.getEntityId()
-            );
+        String prompt = """
+                %s
 
-            String prompt = """
-                    %s
+                下面是订单领域的静态业务事实：
+                %s
 
-                    下面是订单领域的静态业务事实：
-                    %s
+                当前用户问题的查询重点是：
+                %s
 
-                    下面是当前用户有权访问的指定订单真实详情：
-                    %s
+                你现在是 EFoodPass 的订单助手。
+                用户已经给出了明确的订单ID。只要问题涉及订单状态、订单金额、菜品明细或订单详情，
+                你就应该调用工具 `getAccessibleOrderDetail` 获取真实数据，不要根据静态事实猜测动态结果。
 
-                    当前用户问题的查询重点是：
-                    %s
+                如果工具返回：
+                1. status = success：基于真实订单数据回答
+                2. status = not_found：明确说明订单不存在
+                3. status = restricted：明确说明当前登录用户无权查看该订单
 
-                    你现在是 EFoodPass 的订单助手。
-                    请优先围绕这个查询重点回答，不要展开无关内容，也不要编造。
+                不要编造任何订单详情。
+                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
+                JSON 格式如下：
+                {
+                  "content": "给用户的中文回答"
+                }
+                """.formatted(
+                businessContextProvider.buildCommonFacts(),
+                orderFactProvider.buildOrderFacts(),
+                buildIntentHint(reference)
+        );
 
-                    你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                    JSON 格式如下：
-                    {
-                      "content": "给用户的中文回答"
-                    }
-                    """.formatted(
-                    businessContextProvider.buildCommonFacts(),
-                    orderFactProvider.buildOrderFacts(),
-                    detailFacts,
-                    buildIntentHint(reference)
-            );
-
-            return new AiPromptPlan(
+        return new AiPromptPlan(
                 prompt,
                 AiAnswerType.NORMAL,
                 true,
                 resolveDetailAction(reference),
-                buildDetailCard(reference, context.currentUserId(), context.canViewAnyOrder())
-            );
-        } catch (BusinessException e) {
-            AiAnswerType answerType = resolveAnswerType(e);
-            String prompt = """
-                    %s
-
-                    下面是订单领域的静态业务事实：
-                    %s
-
-                    当前有一条真实业务限制信息：
-                    - 无法加载该订单详情，原因：%s
-
-                    你现在是 EFoodPass 的订单助手。
-                    请基于这条真实限制信息，用简洁中文说明情况，不要编造任何订单详情。
-
-                    你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                    JSON 格式如下：
-                    {
-                      "content": "给用户的中文回答"
-                    }
-                    """.formatted(
-                    businessContextProvider.buildCommonFacts(),
-                    orderFactProvider.buildOrderFacts(),
-                    buildAccessHint(answerType)
-            );
-
-            return new AiPromptPlan(
-                    prompt,
-                    answerType,
-                    true,
-                    "ask_more_details",
-                    buildFailureCard(answerType)
-            );
-        }
+                buildDetailToolCard(reference),
+                new Object[]{orderAiTools},
+                buildToolContext(context)
+        );
     }
 
     private String buildGeneralPrompt() {
@@ -191,7 +167,7 @@ public class OrderAiSceneService implements AiSceneHandler {
 
                 你现在是 EFoodPass 的订单助手。
                 当前问题更偏向订单规则、订单状态定义或订单流程说明。
-                请严格基于这些真实事实回答，不要编造。
+                这类问题优先基于静态业务事实回答，不需要调用工具。
 
                 你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
                 JSON 格式如下：
@@ -204,19 +180,20 @@ public class OrderAiSceneService implements AiSceneHandler {
         );
     }
 
-    private String buildRealtimePrompt() {
+    private String buildRealtimeToolPrompt() {
         return """
                 %s
 
                 下面是订单领域的静态业务事实：
                 %s
 
-                下面是订单领域的实时业务数据：
-                %s
-
                 你现在是 EFoodPass 的订单助手。
-                当前问题更偏向订单统计、数量、金额或实时情况。
-                请严格基于这些真实事实和实时数据回答，不要编造。
+                当前问题更偏向订单统计、订单数量、金额汇总或整体情况。
+                对于这类动态问题，你应该调用工具 `getOrderStatistics` 获取实时数据，
+                不要根据静态事实猜测统计结果。
+
+                如果工具返回 success，就基于工具结果回答。
+                不要编造任何统计数字。
 
                 你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
                 JSON 格式如下：
@@ -225,8 +202,7 @@ public class OrderAiSceneService implements AiSceneHandler {
                 }
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
-                orderFactProvider.buildOrderFacts(),
-                orderAiSupportService.buildRealtimeOrderFacts()
+                orderFactProvider.buildOrderFacts()
         );
     }
 
@@ -248,25 +224,11 @@ public class OrderAiSceneService implements AiSceneHandler {
         };
     }
 
-    private AiAnswerType resolveAnswerType(BusinessException e) {
-        Integer code = e.getCode();
-        if (code == null) {
-            return AiAnswerType.RESTRICTED;
-        }
-
-        return switch (code) {
-            case BizErrorCode.ORDER_NOT_FOUND -> AiAnswerType.NOT_FOUND;
-            case BizErrorCode.ORDER_NO_PERMISSION -> AiAnswerType.RESTRICTED;
-            default -> AiAnswerType.RESTRICTED;
-        };
-    }
-
-    private String buildAccessHint(AiAnswerType answerType) {
-        return switch (answerType) {
-            case NOT_FOUND -> "该订单不存在";
-            case RESTRICTED -> "当前登录用户无权查看该订单";
-            case NORMAL -> "订单详情可正常访问";
-        };
+    private Map<String, Object> buildToolContext(AiSceneRequestContext context) {
+        return Map.of(
+                AiToolContextKeys.CURRENT_USER_ID, context.currentUserId(),
+                AiToolContextKeys.CAN_VIEW_ANY_ORDER, context.canViewAnyOrder()
+        );
     }
 
     private AiDisplayCard buildStatusCard() {
@@ -280,56 +242,28 @@ public class OrderAiSceneService implements AiSceneHandler {
         );
     }
 
-    private AiDisplayCard buildStatsCard() {
-        var overview = orderAiSupportService.getOrderStatOverview();
-
+    private AiDisplayCard buildRealtimeToolCard() {
         return new AiDisplayCard(
                 "订单实时统计",
                 "order-stats",
-                "当前卡片展示订单统计关键指标。",
+                "这类问题会由模型按需调用订单统计工具获取实时数据。",
                 List.of(
-                        new AiDisplayField("订单总数", String.valueOf(overview.getTotalOrderCount())),
-                        new AiDisplayField("待确认", String.valueOf(overview.getPendingOrderCount())),
-                        new AiDisplayField("制作中", String.valueOf(overview.getProcessingOrderCount())),
-                        new AiDisplayField("已完成", String.valueOf(overview.getCompletedOrderCount())),
-                        new AiDisplayField("已取消", String.valueOf(overview.getCanceledOrderCount())),
-                        new AiDisplayField("订单总金额", String.valueOf(overview.getTotalAmount())),
-                        new AiDisplayField("已完成金额", String.valueOf(overview.getCompletedAmount()))
+                        new AiDisplayField("数据来源", "getOrderStatistics 工具"),
+                        new AiDisplayField("查询方式", "模型按需调用")
                 )
         );
     }
 
-    private AiDisplayCard buildDetailCard(AiEntityReference reference, Long currentUserId, boolean canViewAnyOrder) {
-        if (reference.getEntityId() == null) {
-            return new AiDisplayCard("订单详情", "order-detail", "未能从问题中提取订单编号。", List.of());
-        }
-
-        try {
-            var detail = orderAiSupportService.getAccessibleOrderDetail(currentUserId, canViewAnyOrder, reference.getEntityId());
-
-            return new AiDisplayCard(
-                    "订单详情",
-                    "order-detail",
-                    "当前卡片展示指定订单的关键字段。",
-                    List.of(
-                            new AiDisplayField("订单ID", String.valueOf(detail.getId())),
-                            new AiDisplayField("订单编号", detail.getOrderNo()),
-                            new AiDisplayField("用户ID", String.valueOf(detail.getUserId())),
-                            new AiDisplayField("订单状态", detail.getOrderStatus() + "（" + FoodOrderStatus.getLabelByCode(detail.getOrderStatus()) + "）"),
-                            new AiDisplayField("总金额", String.valueOf(detail.getTotalAmount())),
-                            new AiDisplayField("下单时间", String.valueOf(detail.getCreatedAt()))
-                    )
-            );
-        } catch (BusinessException e) {
-            return new AiDisplayCard("订单详情", "order-detail", "当前无法展示订单关键字段。", List.of());
-        }
-    }
-
-    private AiDisplayCard buildFailureCard(AiAnswerType answerType) {
-        return switch (answerType) {
-            case NOT_FOUND -> new AiDisplayCard("未找到目标数据", "not-found", "当前查询目标不存在，请确认输入的信息是否正确。", List.of());
-            case RESTRICTED -> new AiDisplayCard("访问受限", "restricted", "当前登录用户无权访问该数据，或系统不允许返回详情。", List.of());
-            case NORMAL -> new AiDisplayCard("订单详情", "order-detail", "当前无法展示订单关键字段。", List.of());
-        };
+    private AiDisplayCard buildDetailToolCard(AiEntityReference reference) {
+        return new AiDisplayCard(
+                "订单详情查询",
+                "order-detail",
+                "这类问题会由模型按需调用订单详情工具获取真实数据。",
+                List.of(
+                        new AiDisplayField("订单ID", String.valueOf(reference.getEntityId())),
+                        new AiDisplayField("查询重点", buildIntentHint(reference)),
+                        new AiDisplayField("数据来源", "getAccessibleOrderDetail 工具")
+                )
+        );
     }
 }

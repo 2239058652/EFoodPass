@@ -12,7 +12,6 @@ public class OrderQuestionClassifier {
         this.orderEntityReferenceResolver = orderEntityReferenceResolver;
     }
 
-
     public OrderQuestionType classify(String message) {
         if (message == null || message.isBlank()) {
             return OrderQuestionType.GENERAL_ORDER;

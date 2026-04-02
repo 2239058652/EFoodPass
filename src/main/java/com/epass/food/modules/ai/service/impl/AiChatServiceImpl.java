@@ -48,6 +48,7 @@ public class AiChatServiceImpl implements AiChatService {
     public AiChatResponse chat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder) {
         String resolvedSessionId = conversationMemoryService.ensureSessionId(sessionId);
         long userCreatedAt = System.currentTimeMillis();
+
         SceneResolution sceneResolution = resolveSceneType(message, currentUserId, resolvedSessionId);
         AiConversationMemoryService.ConversationPromptContext promptContext =
                 conversationMemoryService.getPromptContext(currentUserId, resolvedSessionId);
@@ -61,11 +62,18 @@ public class AiChatServiceImpl implements AiChatService {
         AiPromptPlan promptPlan = buildPromptByScene(sceneResolution.sceneType(), context);
         String promptWithHistory = appendConversationHistory(promptPlan.prompt(), promptContext);
 
-        String rawContent = chatClient.prompt()
+        var requestSpec = chatClient.prompt()
                 .system(promptWithHistory)
-                .user(message)
-                .call()
-                .content();
+                .user(message);
+
+        if (promptPlan.hasTools()) {
+            requestSpec = requestSpec.tools(promptPlan.tools());
+            if (!promptPlan.toolContext().isEmpty()) {
+                requestSpec = requestSpec.toolContext(promptPlan.toolContext());
+            }
+        }
+
+        String rawContent = requestSpec.call().content();
 
         long assistantCreatedAt = System.currentTimeMillis();
         AiStructuredReply reply = parseStructuredReply(rawContent);
