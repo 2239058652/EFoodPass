@@ -32,6 +32,7 @@ public class AiChatController {
         return Result.success(
                 aiChatService.chat(
                         request.getMessage(),
+                        request.getSessionId(),
                         loginUser.getUserId(),
                         canViewAnyOrder
                 )

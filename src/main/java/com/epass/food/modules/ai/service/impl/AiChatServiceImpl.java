@@ -8,6 +8,7 @@ import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import com.epass.food.modules.ai.dto.AiStructuredReply;
 import com.epass.food.modules.ai.service.AiChatService;
+import com.epass.food.modules.ai.service.AiConversationMemoryService;
 import com.epass.food.modules.ai.service.AiSceneHandler;
 import com.epass.food.modules.ai.service.AiSceneClassifier;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -25,32 +26,39 @@ public class AiChatServiceImpl implements AiChatService {
     private final ChatClient chatClient;
     private final AiSceneClassifier aiSceneClassifier;
     private final ObjectMapper objectMapper;
+    private final AiConversationMemoryService conversationMemoryService;
     private final Map<AiSceneType, AiSceneHandler> sceneHandlerMap;
 
     public AiChatServiceImpl(ChatClient.Builder chatClientBuilder,
                              AiSceneClassifier aiSceneClassifier,
                              ObjectMapper objectMapper,
+                             AiConversationMemoryService conversationMemoryService,
                              List<AiSceneHandler> sceneHandlers) {
         this.chatClient = chatClientBuilder.build();
         this.aiSceneClassifier = aiSceneClassifier;
         this.objectMapper = objectMapper;
+        this.conversationMemoryService = conversationMemoryService;
         this.sceneHandlerMap = buildSceneHandlerMap(sceneHandlers);
     }
 
     @Override
-    public AiChatResponse chat(String message, Long currentUserId, boolean canViewAnyOrder) {
-        AiSceneRequestContext context = new AiSceneRequestContext(message, currentUserId, canViewAnyOrder);
-        AiSceneType sceneType = aiSceneClassifier.classify(message);
+    public AiChatResponse chat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder) {
+        String resolvedSessionId = conversationMemoryService.ensureSessionId(sessionId);
+        AiSceneType sceneType = resolveSceneType(message, currentUserId, resolvedSessionId);
+        AiSceneRequestContext context = new AiSceneRequestContext(message, resolvedSessionId, currentUserId, canViewAnyOrder);
         AiPromptPlan promptPlan = buildPromptByScene(sceneType, context);
+        String promptWithHistory = appendConversationHistory(promptPlan.prompt(), currentUserId, resolvedSessionId);
 
         String rawContent = chatClient.prompt()
-                .system(promptPlan.prompt())
+                .system(promptWithHistory)
                 .user(message)
                 .call()
                 .content();
 
         AiStructuredReply reply = parseStructuredReply(rawContent);
+        conversationMemoryService.appendTurn(currentUserId, resolvedSessionId, sceneType, message, reply.getContent());
         return new AiChatResponse(
+                resolvedSessionId,
                 reply.getContent(),
                 sceneType.name().toLowerCase(),
                 promptPlan.grounded(),
@@ -66,6 +74,59 @@ public class AiChatServiceImpl implements AiChatService {
             throw new BusinessException(500, "未找到 AI 场景处理器: " + sceneType);
         }
         return sceneHandler.buildPlan(context);
+    }
+
+    private AiSceneType resolveSceneType(String message, Long currentUserId, String sessionId) {
+        AiSceneType sceneType = aiSceneClassifier.classify(message);
+        if (sceneType != AiSceneType.GENERAL) {
+            return sceneType;
+        }
+
+        if (!shouldReuseLastScene(message)) {
+            return sceneType;
+        }
+
+        return conversationMemoryService.getLastScene(currentUserId, sessionId).orElse(AiSceneType.GENERAL);
+    }
+
+    private boolean shouldReuseLastScene(String message) {
+        if (message == null || message.isBlank()) {
+            return false;
+        }
+
+        String trimmed = message.trim();
+        return trimmed.length() <= 12
+                || trimmed.contains("那")
+                || trimmed.contains("这个")
+                || trimmed.contains("它")
+                || trimmed.contains("继续")
+                || trimmed.contains("然后")
+                || trimmed.contains("还有");
+    }
+
+    private String appendConversationHistory(String basePrompt, Long currentUserId, String sessionId) {
+        List<AiConversationMemoryService.ConversationTurn> turns =
+                conversationMemoryService.getRecentTurns(currentUserId, sessionId, 3);
+        if (turns.isEmpty()) {
+            return basePrompt;
+        }
+
+        StringBuilder historyBuilder = new StringBuilder();
+        historyBuilder.append("\n\n下面是最近的对话上下文，仅用于帮助理解当前问题：\n");
+        int index = 1;
+        for (AiConversationMemoryService.ConversationTurn turn : turns) {
+            historyBuilder.append(index)
+                    .append(". 用户：")
+                    .append(turn.userMessage())
+                    .append("\n");
+            historyBuilder.append(index)
+                    .append(". 助手：")
+                    .append(turn.assistantMessage())
+                    .append("\n");
+            index++;
+        }
+        historyBuilder.append("回答当前问题时优先看本轮问题，如果历史上下文与本轮冲突，以本轮为准。");
+        return basePrompt + historyBuilder;
     }
 
     private AiStructuredReply parseStructuredReply(String rawContent) {

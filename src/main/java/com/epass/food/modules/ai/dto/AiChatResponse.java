@@ -7,6 +7,8 @@ import lombok.Data;
 @AllArgsConstructor
 public class AiChatResponse {
 
+    private String sessionId;
+
     private String content;
 
     private String scene;
