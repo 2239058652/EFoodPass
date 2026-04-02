@@ -148,6 +148,8 @@ public class AiConversationMemoryService {
         Duration ttl = Duration.ofHours(properties.getTtlHours());
 
         ConversationTurn turn = new ConversationTurn(
+                UUID.randomUUID().toString(),
+                UUID.randomUUID().toString(),
                 userMessage,
                 assistantMessage,
                 userCreatedAt,
@@ -233,10 +235,22 @@ public class AiConversationMemoryService {
         }
 
         List<AiConversationMessage> messages = new ArrayList<>();
+        int index = 0;
         for (String value : values) {
             ConversationTurn turn = deserializeTurn(value);
-            messages.add(new AiConversationMessage("user", turn.userMessage(), turn.userCreatedAt()));
-            messages.add(new AiConversationMessage("assistant", turn.assistantMessage(), turn.assistantCreatedAt()));
+            messages.add(new AiConversationMessage(
+                    resolveUserMessageId(turn, sessionId, index),
+                    "user",
+                    turn.userMessage(),
+                    turn.userCreatedAt()
+            ));
+            messages.add(new AiConversationMessage(
+                    resolveAssistantMessageId(turn, sessionId, index),
+                    "assistant",
+                    turn.assistantMessage(),
+                    turn.assistantCreatedAt()
+            ));
+            index++;
         }
         return messages;
     }
@@ -256,6 +270,20 @@ public class AiConversationMemoryService {
         List<AiConversationMessage> pageMessages = new ArrayList<>(allMessages.subList(startInclusive, endExclusive));
         boolean hasMore = startInclusive > 0;
         return new MessagePage(pageMessages, hasMore);
+    }
+
+    private String resolveUserMessageId(ConversationTurn turn, String sessionId, int turnIndex) {
+        if (StringUtils.hasText(turn.userMessageId())) {
+            return turn.userMessageId();
+        }
+        return sessionId + "-user-" + turnIndex;
+    }
+
+    private String resolveAssistantMessageId(ConversationTurn turn, String sessionId, int turnIndex) {
+        if (StringUtils.hasText(turn.assistantMessageId())) {
+            return turn.assistantMessageId();
+        }
+        return sessionId + "-assistant-" + turnIndex;
     }
 
     private String buildPromptTurnsKey(Long userId, String sessionId) {
@@ -409,7 +437,9 @@ public class AiConversationMemoryService {
     public record ConversationPromptContext(String summary, List<ConversationTurn> recentTurns) {
     }
 
-    public record ConversationTurn(String userMessage,
+    public record ConversationTurn(String userMessageId,
+                                   String assistantMessageId,
+                                   String userMessage,
                                    String assistantMessage,
                                    Long userCreatedAt,
                                    Long assistantCreatedAt) {
