@@ -31,6 +31,7 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -38,6 +39,7 @@ import static org.mockito.Mockito.when;
 class AiChatServiceImplTest {
 
     private static final String MESSAGE = "order 1 status?";
+    private static final String FOLLOW_UP_MESSAGE = "then amount?";
     private static final String SESSION_ID = "session-1";
     private static final long USER_ID = 1L;
 
@@ -94,7 +96,7 @@ class AiChatServiceImplTest {
         when(conversationMemoryService.ensureSessionId(SESSION_ID)).thenReturn(SESSION_ID);
         when(conversationMemoryService.getPromptContext(USER_ID, SESSION_ID))
                 .thenReturn(new AiConversationMemoryService.ConversationPromptContext(null, List.of()));
-        when(aiSceneClassifier.classify(MESSAGE)).thenReturn(AiSceneType.ORDER);
+        lenient().when(aiSceneClassifier.classify(MESSAGE)).thenReturn(AiSceneType.ORDER);
 
         aiChatService = new AiChatServiceImpl(
                 chatClientBuilder,
@@ -137,17 +139,12 @@ class AiChatServiceImplTest {
 
     @Test
     void chatShouldMapToolStatusNotFoundIntoStructuredResponse() {
-        String json = """
+        when(callResponseSpec.chatClientResponse()).thenReturn(chatClientResponse("""
                 {
                   "content": "order not found, please confirm the id",
                   "toolStatus": "not_found"
                 }
-                """;
-        ChatClientResponse chatClientResponse = new ChatClientResponse(
-                new ChatResponse(List.of(new Generation(new AssistantMessage(json)))),
-                Map.of()
-        );
-        when(callResponseSpec.chatClientResponse()).thenReturn(chatClientResponse);
+                """));
 
         AiChatResponse response = aiChatService.chat(MESSAGE, SESSION_ID, USER_ID, false);
 
@@ -158,5 +155,62 @@ class AiChatServiceImplTest {
         assertThat(response.getGrounded()).isTrue();
 
         verify(aiMetricsService).recordChat(eq("order"), eq("not_found"), eq("not_found"), any(), anyLong());
+    }
+
+    @Test
+    void chatShouldMapToolStatusRestrictedIntoStructuredResponse() {
+        when(callResponseSpec.chatClientResponse()).thenReturn(chatClientResponse("""
+                {
+                  "content": "access denied for this order",
+                  "toolStatus": "restricted"
+                }
+                """));
+
+        AiChatResponse response = aiChatService.chat(MESSAGE, SESSION_ID, USER_ID, false);
+
+        assertThat(response.getAnswerType()).isEqualTo("restricted");
+        assertThat(response.getToolStatus()).isEqualTo("restricted");
+        assertThat(response.getNextAction()).isEqualTo("ask_more_details");
+        assertThat(response.getCard().getType()).isEqualTo("restricted");
+
+        verify(aiMetricsService).recordChat(eq("order"), eq("restricted"), eq("restricted"), any(), anyLong());
+    }
+
+    @Test
+    void chatShouldReuseLastSceneForShortFollowUpQuestion() {
+        when(aiSceneClassifier.classify(FOLLOW_UP_MESSAGE)).thenReturn(AiSceneType.GENERAL);
+        when(conversationMemoryService.getLastScene(USER_ID, SESSION_ID)).thenReturn(java.util.Optional.of(AiSceneType.ORDER));
+        when(callResponseSpec.chatClientResponse()).thenReturn(chatClientResponse("""
+                {
+                  "content": "the amount is 28.00"
+                }
+                """));
+
+        AiChatResponse response = aiChatService.chat(FOLLOW_UP_MESSAGE, SESSION_ID, USER_ID, false);
+
+        assertThat(response.getScene()).isEqualTo("order");
+        assertThat(response.getAnswerType()).isEqualTo("normal");
+        assertThat(response.getToolStatus()).isEqualTo("none");
+        assertThat(response.getNextAction()).isEqualTo("view_order_module");
+        assertThat(response.getConversation()).isNotNull();
+        assertThat(response.getConversation().getSceneReused()).isTrue();
+
+        verify(conversationMemoryService).getLastScene(USER_ID, SESSION_ID);
+        verify(conversationMemoryService).appendTurn(
+                eq(USER_ID),
+                eq(SESSION_ID),
+                eq(AiSceneType.ORDER),
+                eq(FOLLOW_UP_MESSAGE),
+                eq("the amount is 28.00"),
+                anyLong(),
+                anyLong()
+        );
+    }
+
+    private ChatClientResponse chatClientResponse(String json) {
+        return new ChatClientResponse(
+                new ChatResponse(List.of(new Generation(new AssistantMessage(json)))),
+                Map.of()
+        );
     }
 }
