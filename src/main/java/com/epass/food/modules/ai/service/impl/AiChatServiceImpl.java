@@ -8,6 +8,7 @@ import com.epass.food.modules.ai.dto.AiConversationMeta;
 import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
+import com.epass.food.modules.ai.dto.AiModelUsage;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
@@ -21,6 +22,9 @@ import com.epass.food.modules.ai.service.AiSceneHandler;
 import com.epass.food.modules.ai.service.AiStructuredOutputAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.Usage;
+import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -62,7 +66,7 @@ public class AiChatServiceImpl implements AiChatService {
         SceneRuntime runtime = prepareRuntime(message, resolvedSessionId, currentUserId, canViewAnyOrder);
         var requestSpec = buildStructuredRequest(runtime);
 
-        ResponseEntity<?, AiStructuredReply> responseEntity;
+        ResponseEntity<ChatResponse, AiStructuredReply> responseEntity;
         try {
             responseEntity = requestSpec.call().responseEntity(AiStructuredReply.class);
         } catch (RuntimeException e) {
@@ -79,6 +83,7 @@ public class AiChatServiceImpl implements AiChatService {
         String finalToolStatus = normalizeToolStatus(reply.getToolStatus());
         String finalNextAction = resolveNextAction(runtime.promptPlan.nextAction(), finalAnswerType);
         AiDisplayCard finalCard = resolveCard(runtime.promptPlan.card(), finalAnswerType);
+        AiModelUsage usage = extractUsage(responseEntity);
 
         conversationMemoryService.appendTurn(
                 currentUserId,
@@ -99,6 +104,7 @@ public class AiChatServiceImpl implements AiChatService {
                 finalAnswerType.name().toLowerCase(),
                 finalToolStatus,
                 finalCard,
+                usage,
                 buildConversationMeta(runtime.promptContext, runtime.sceneResolution.reused())
         );
     }
@@ -314,6 +320,26 @@ public class AiChatServiceImpl implements AiChatService {
                     List.of()
             );
         };
+    }
+
+    private AiModelUsage extractUsage(ResponseEntity<ChatResponse, AiStructuredReply> responseEntity) {
+        if (responseEntity == null || responseEntity.response() == null) {
+            return null;
+        }
+
+        ChatResponseMetadata metadata = responseEntity.response().getMetadata();
+        if (metadata == null) {
+            return null;
+        }
+
+        Usage usage = metadata.getUsage();
+        return new AiModelUsage(
+                metadata.getId(),
+                metadata.getModel(),
+                usage == null ? null : usage.getPromptTokens(),
+                usage == null ? null : usage.getCompletionTokens(),
+                usage == null ? null : usage.getTotalTokens()
+        );
     }
 
     private Map<AiSceneType, AiSceneHandler> buildSceneHandlerMap(List<AiSceneHandler> sceneHandlers) {

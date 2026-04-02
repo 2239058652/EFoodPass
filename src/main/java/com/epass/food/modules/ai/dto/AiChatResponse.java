@@ -23,5 +23,7 @@ public class AiChatResponse {
 
     private AiDisplayCard card;
 
+    private AiModelUsage usage;
+
     private AiConversationMeta conversation;
 }
