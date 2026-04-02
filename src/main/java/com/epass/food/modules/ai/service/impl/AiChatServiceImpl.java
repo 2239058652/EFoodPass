@@ -8,6 +8,7 @@ import com.epass.food.modules.ai.dto.AiConversationMeta;
 import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
+import com.epass.food.modules.ai.dto.AiDisplayField;
 import com.epass.food.modules.ai.dto.AiModelUsage;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiRetrievalMeta;
@@ -79,60 +80,58 @@ public class AiChatServiceImpl implements AiChatService {
         SceneRuntime runtime = prepareRuntime(message, resolvedSessionId, currentUserId, canViewAnyOrder);
         var requestSpec = buildStructuredRequest(runtime);
 
-        ChatClientResponse chatClientResponse;
-        AiStructuredReply reply;
         try {
-            chatClientResponse = requestSpec.call().chatClientResponse();
-            reply = new BeanOutputConverter<>(AiStructuredReply.class)
+            ChatClientResponse chatClientResponse = requestSpec.call().chatClientResponse();
+            AiStructuredReply reply = new BeanOutputConverter<>(AiStructuredReply.class)
                     .convert(extractAssistantText(chatClientResponse.chatResponse()));
+
+            if (reply == null || !StringUtils.hasText(reply.getContent())) {
+                return buildFallbackResponse(runtime, resolvedSessionId, currentUserId, message, userCreatedAt, startedAt, "empty_content");
+            }
+
+            long assistantCreatedAt = System.currentTimeMillis();
+            AiAnswerType finalAnswerType = resolveAnswerType(runtime.promptPlan.answerType(), reply.getToolStatus());
+            String finalToolStatus = normalizeToolStatus(reply.getToolStatus());
+            String finalNextAction = resolveNextAction(runtime.promptPlan.nextAction(), finalAnswerType);
+            AiDisplayCard finalCard = resolveCard(runtime.promptPlan.card(), finalAnswerType);
+            AiModelUsage usage = extractUsage(chatClientResponse.chatResponse());
+            AiRetrievalMeta retrievalMeta = extractRetrievalMeta(chatClientResponse, runtime.promptPlan);
+
+            conversationMemoryService.appendTurn(
+                    currentUserId,
+                    resolvedSessionId,
+                    runtime.sceneResolution.sceneType(),
+                    message,
+                    reply.getContent(),
+                    userCreatedAt,
+                    assistantCreatedAt
+            );
+
+            AiChatResponse response = new AiChatResponse(
+                    resolvedSessionId,
+                    reply.getContent(),
+                    runtime.sceneResolution.sceneType().name().toLowerCase(),
+                    runtime.promptPlan.grounded(),
+                    finalNextAction,
+                    finalAnswerType.name().toLowerCase(),
+                    finalToolStatus,
+                    finalCard,
+                    usage,
+                    buildConversationMeta(runtime.promptContext, runtime.sceneResolution.reused()),
+                    retrievalMeta
+            );
+
+            aiMetricsService.recordChat(
+                    response.getScene(),
+                    response.getAnswerType(),
+                    response.getToolStatus(),
+                    response.getRetrieval(),
+                    System.currentTimeMillis() - startedAt
+            );
+            return response;
         } catch (RuntimeException e) {
-            throw new BusinessException(500, "AI 结构化输出解析失败");
+            return buildFallbackResponse(runtime, resolvedSessionId, currentUserId, message, userCreatedAt, startedAt, "model_call");
         }
-
-        long assistantCreatedAt = System.currentTimeMillis();
-        if (reply == null || !StringUtils.hasText(reply.getContent())) {
-            throw new BusinessException(500, "AI 返回的结构化内容为空");
-        }
-
-        AiAnswerType finalAnswerType = resolveAnswerType(runtime.promptPlan.answerType(), reply.getToolStatus());
-        String finalToolStatus = normalizeToolStatus(reply.getToolStatus());
-        String finalNextAction = resolveNextAction(runtime.promptPlan.nextAction(), finalAnswerType);
-        AiDisplayCard finalCard = resolveCard(runtime.promptPlan.card(), finalAnswerType);
-        AiModelUsage usage = extractUsage(chatClientResponse.chatResponse());
-        AiRetrievalMeta retrievalMeta = extractRetrievalMeta(chatClientResponse, runtime.promptPlan);
-
-        conversationMemoryService.appendTurn(
-                currentUserId,
-                resolvedSessionId,
-                runtime.sceneResolution.sceneType(),
-                message,
-                reply.getContent(),
-                userCreatedAt,
-                assistantCreatedAt
-        );
-
-        AiChatResponse response = new AiChatResponse(
-                resolvedSessionId,
-                reply.getContent(),
-                runtime.sceneResolution.sceneType().name().toLowerCase(),
-                runtime.promptPlan.grounded(),
-                finalNextAction,
-                finalAnswerType.name().toLowerCase(),
-                finalToolStatus,
-                finalCard,
-                usage,
-                buildConversationMeta(runtime.promptContext, runtime.sceneResolution.reused()),
-                retrievalMeta
-        );
-
-        aiMetricsService.recordChat(
-                response.getScene(),
-                response.getAnswerType(),
-                response.getToolStatus(),
-                response.getRetrieval(),
-                System.currentTimeMillis() - startedAt
-        );
-        return response;
     }
 
     @Override
@@ -357,6 +356,15 @@ public class AiChatServiceImpl implements AiChatService {
     private AiDisplayCard resolveCard(AiDisplayCard defaultCard, AiAnswerType answerType) {
         return switch (answerType) {
             case NORMAL -> defaultCard;
+            case DEGRADED -> new AiDisplayCard(
+                    "AI 降级响应",
+                    "fallback",
+                    "本次请求未能完成标准 AI 链路，系统已返回安全降级结果。",
+                    List.of(
+                            new AiDisplayField("建议", "稍后重试，或把问题改写得更具体一些"),
+                            new AiDisplayField("处理方式", "已回退为受控兜底响应")
+                    )
+            );
             case NOT_FOUND -> new AiDisplayCard(
                     "未找到目标数据",
                     "not-found",
@@ -442,6 +450,55 @@ public class AiChatServiceImpl implements AiChatService {
                 document.getScore(),
                 snippet
         );
+    }
+
+    private AiChatResponse buildFallbackResponse(SceneRuntime runtime,
+                                                 String sessionId,
+                                                 Long currentUserId,
+                                                 String userMessage,
+                                                 long userCreatedAt,
+                                                 long startedAt,
+                                                 String stage) {
+        String scene = runtime.sceneResolution.sceneType().name().toLowerCase();
+        String content = """
+                当前 AI 助手暂时无法稳定完成本次回答，系统已返回降级结果。
+                你可以稍后重试，或把问题描述得更具体一些。
+                """.trim();
+
+        long assistantCreatedAt = System.currentTimeMillis();
+        conversationMemoryService.appendTurn(
+                currentUserId,
+                sessionId,
+                runtime.sceneResolution.sceneType(),
+                userMessage,
+                content,
+                userCreatedAt,
+                assistantCreatedAt
+        );
+
+        AiChatResponse response = new AiChatResponse(
+                sessionId,
+                content,
+                scene,
+                false,
+                "ask_more_details",
+                AiAnswerType.DEGRADED.name().toLowerCase(),
+                "degraded",
+                resolveCard(runtime.promptPlan.card(), AiAnswerType.DEGRADED),
+                null,
+                buildConversationMeta(runtime.promptContext, runtime.sceneResolution.reused()),
+                extractRetrievalMeta(null, runtime.promptPlan)
+        );
+
+        aiMetricsService.recordFallback(scene, stage);
+        aiMetricsService.recordChat(
+                response.getScene(),
+                response.getAnswerType(),
+                response.getToolStatus(),
+                response.getRetrieval(),
+                System.currentTimeMillis() - startedAt
+        );
+        return response;
     }
 
     private String stringValue(Object value) {

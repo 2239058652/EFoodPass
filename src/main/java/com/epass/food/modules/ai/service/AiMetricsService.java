@@ -60,6 +60,14 @@ public class AiMetricsService {
                 .record(Duration.ofMillis(durationMillis));
     }
 
+    public void recordFallback(String scene, String stage) {
+        Counter.builder("ai.chat.fallback.count")
+                .tag("scene", normalize(scene))
+                .tag("stage", normalize(stage))
+                .register(meterRegistry)
+                .increment();
+    }
+
     public void recordKnowledgeRebuild(String knowledgeBase, int documentCount) {
         Counter.builder("ai.rag.index.rebuild.count")
                 .tag("knowledge_base", normalize(knowledgeBase))
