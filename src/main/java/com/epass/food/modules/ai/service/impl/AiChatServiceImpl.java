@@ -15,9 +15,8 @@ import com.epass.food.modules.ai.service.AiChatService;
 import com.epass.food.modules.ai.service.AiConversationMemoryService;
 import com.epass.food.modules.ai.service.AiSceneClassifier;
 import com.epass.food.modules.ai.service.AiSceneHandler;
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
+import org.springframework.ai.chat.client.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
@@ -30,18 +29,15 @@ public class AiChatServiceImpl implements AiChatService {
 
     private final ChatClient chatClient;
     private final AiSceneClassifier aiSceneClassifier;
-    private final ObjectMapper objectMapper;
     private final AiConversationMemoryService conversationMemoryService;
     private final Map<AiSceneType, AiSceneHandler> sceneHandlerMap;
 
     public AiChatServiceImpl(ChatClient.Builder chatClientBuilder,
                              AiSceneClassifier aiSceneClassifier,
-                             ObjectMapper objectMapper,
                              AiConversationMemoryService conversationMemoryService,
                              List<AiSceneHandler> sceneHandlers) {
         this.chatClient = chatClientBuilder.build();
         this.aiSceneClassifier = aiSceneClassifier;
-        this.objectMapper = objectMapper;
         this.conversationMemoryService = conversationMemoryService;
         this.sceneHandlerMap = buildSceneHandlerMap(sceneHandlers);
     }
@@ -75,10 +71,19 @@ public class AiChatServiceImpl implements AiChatService {
             }
         }
 
-        String rawContent = requestSpec.call().content();
+        ResponseEntity<?, AiStructuredReply> responseEntity;
+        try {
+            responseEntity = requestSpec.call().responseEntity(AiStructuredReply.class);
+        } catch (RuntimeException e) {
+            throw new BusinessException(500, "AI 结构化输出解析失败");
+        }
 
         long assistantCreatedAt = System.currentTimeMillis();
-        AiStructuredReply reply = parseStructuredReply(rawContent);
+        AiStructuredReply reply = responseEntity.entity();
+        if (reply == null || !StringUtils.hasText(reply.getContent())) {
+            throw new BusinessException(500, "AI 返回的结构化内容为空");
+        }
+
         AiAnswerType finalAnswerType = resolveAnswerType(promptPlan.answerType(), reply.getToolStatus());
         String finalToolStatus = normalizeToolStatus(reply.getToolStatus());
         String finalNextAction = resolveNextAction(promptPlan.nextAction(), finalAnswerType);
@@ -258,14 +263,6 @@ public class AiChatServiceImpl implements AiChatService {
                     List.of()
             );
         };
-    }
-
-    private AiStructuredReply parseStructuredReply(String rawContent) {
-        try {
-            return objectMapper.readValue(rawContent, AiStructuredReply.class);
-        } catch (JsonProcessingException e) {
-            throw new BusinessException(500, "AI 返回结果不是合法 JSON: " + rawContent);
-        }
     }
 
     private Map<AiSceneType, AiSceneHandler> buildSceneHandlerMap(List<AiSceneHandler> sceneHandlers) {
