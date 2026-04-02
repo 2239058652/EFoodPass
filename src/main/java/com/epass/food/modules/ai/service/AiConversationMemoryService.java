@@ -1,6 +1,8 @@
 package com.epass.food.modules.ai.service;
 
 import com.epass.food.common.exception.BusinessException;
+import com.epass.food.modules.ai.dto.AiConversationMessage;
+import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import com.fasterxml.jackson.core.JsonProcessingException;
@@ -95,6 +97,35 @@ public class AiConversationMemoryService {
         return sessions;
     }
 
+    public AiConversationSessionDetail getSessionDetail(Long userId, String sessionId) {
+        if (userId == null || !StringUtils.hasText(sessionId)) {
+            throw new BusinessException(400, "sessionId 不能为空");
+        }
+
+        AiConversationSessionSummary sessionSummary = readSessionMeta(userId, sessionId);
+        if (sessionSummary == null) {
+            throw new BusinessException(404, "会话不存在");
+        }
+
+        String summary = stringRedisTemplate.opsForValue().get(buildSummaryKey(userId, sessionId));
+        List<ConversationTurn> turns = getAllTurns(userId, sessionId);
+        List<AiConversationMessage> messages = new ArrayList<>();
+        for (ConversationTurn turn : turns) {
+            messages.add(new AiConversationMessage("user", turn.userMessage()));
+            messages.add(new AiConversationMessage("assistant", turn.assistantMessage()));
+        }
+
+        return new AiConversationSessionDetail(
+                sessionSummary.getSessionId(),
+                sessionSummary.getTitle(),
+                sessionSummary.getScene(),
+                sessionSummary.getPreview(),
+                sessionSummary.getUpdatedAt(),
+                summary,
+                messages
+        );
+    }
+
     public void appendTurn(Long userId,
                            String sessionId,
                            AiSceneType sceneType,
@@ -173,6 +204,17 @@ public class AiConversationMemoryService {
                 buildSessionMetaKey(userId, sessionId)
         ));
         stringRedisTemplate.opsForZSet().remove(buildSessionIndexKey(userId), sessionId);
+    }
+
+    private List<ConversationTurn> getAllTurns(Long userId, String sessionId) {
+        List<String> values = stringRedisTemplate.opsForList().range(buildTurnsKey(userId, sessionId), 0, -1);
+        if (values == null || values.isEmpty()) {
+            return List.of();
+        }
+
+        return values.stream()
+                .map(this::deserializeTurn)
+                .toList();
     }
 
     private String buildTurnsKey(Long userId, String sessionId) {

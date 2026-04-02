@@ -3,6 +3,7 @@ package com.epass.food.modules.ai.service.impl;
 import com.epass.food.common.exception.BusinessException;
 import com.epass.food.modules.ai.dto.AiChatResponse;
 import com.epass.food.modules.ai.dto.AiConversationMeta;
+import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiSceneRequestContext;
@@ -97,6 +98,11 @@ public class AiChatServiceImpl implements AiChatService {
     @Override
     public List<AiConversationSessionSummary> listSessions(Long currentUserId, int limit) {
         return conversationMemoryService.listSessions(currentUserId, limit);
+    }
+
+    @Override
+    public AiConversationSessionDetail getSessionDetail(String sessionId, Long currentUserId) {
+        return conversationMemoryService.getSessionDetail(currentUserId, sessionId);
     }
 
     @Override

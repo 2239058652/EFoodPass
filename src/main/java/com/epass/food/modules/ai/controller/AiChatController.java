@@ -4,6 +4,7 @@ import com.epass.food.common.result.Result;
 import com.epass.food.config.security.LoginUser;
 import com.epass.food.modules.ai.dto.AiChatRequest;
 import com.epass.food.modules.ai.dto.AiChatResponse;
+import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionRenameRequest;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
 import com.epass.food.modules.ai.service.AiChatService;
@@ -55,6 +56,13 @@ public class AiChatController {
     ) {
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
         return Result.success(aiChatService.listSessions(loginUser.getUserId(), limit));
+    }
+
+    @GetMapping("/session/{sessionId}")
+    public Result<AiConversationSessionDetail> getSessionDetail(@PathVariable String sessionId,
+                                                                Authentication authentication) {
+        LoginUser loginUser = (LoginUser) authentication.getPrincipal();
+        return Result.success(aiChatService.getSessionDetail(sessionId, loginUser.getUserId()));
     }
 
     @PutMapping("/session/{sessionId}/title")
