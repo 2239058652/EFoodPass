@@ -5,6 +5,7 @@ import com.epass.food.modules.ai.dto.AiChatResponse;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiSceneType;
+import com.epass.food.modules.ai.service.AiAdvisorContextKeys;
 import com.epass.food.modules.ai.service.AiConversationMemoryAdvisor;
 import com.epass.food.modules.ai.service.AiConversationMemoryService;
 import com.epass.food.modules.ai.service.AiMetricsService;
@@ -19,8 +20,12 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.messages.AssistantMessage;
+import org.springframework.ai.chat.metadata.ChatResponseMetadata;
+import org.springframework.ai.chat.metadata.DefaultUsage;
 import org.springframework.ai.chat.model.ChatResponse;
 import org.springframework.ai.chat.model.Generation;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
+import org.springframework.ai.document.Document;
 
 import java.util.List;
 import java.util.Map;
@@ -207,10 +212,87 @@ class AiChatServiceImplTest {
         );
     }
 
+    @Test
+    void chatShouldExposeUsageAndRetrievalMetadata() {
+        when(aiSceneHandler.buildPlan(any())).thenReturn(new AiPromptPlan(
+                "system rag prompt",
+                AiAnswerType.NORMAL,
+                true,
+                "view_system_module",
+                new AiDisplayCard("System Modules", "system-modules", "Test card", List.of()),
+                new Object[0],
+                Map.of(),
+                Map.of(
+                        AiAdvisorContextKeys.RAG_KNOWLEDGE_BASE, "system",
+                        AiAdvisorContextKeys.RAG_FILTER_EXPRESSION, "moduleCode == 'system'",
+                        AiAdvisorContextKeys.RAG_TOP_K, 4,
+                        AiAdvisorContextKeys.RAG_SIMILARITY_THRESHOLD, 0.75
+                )
+        ));
+        when(callResponseSpec.chatClientResponse()).thenReturn(chatClientResponse(
+                """
+                {
+                  "content": "permission control is handled by Spring Security",
+                  "toolStatus": "success"
+                }
+                """,
+                ChatResponseMetadata.builder()
+                        .id("resp-1")
+                        .model("qwen-plus")
+                        .usage(new DefaultUsage(120, 45, 165))
+                        .build(),
+                Map.of(
+                        QuestionAnswerAdvisor.RETRIEVED_DOCUMENTS,
+                        List.of(
+                                Document.builder()
+                                        .id("doc-1")
+                                        .text("System permission control relies on Spring Security and @PreAuthorize annotations.")
+                                        .metadata("title", "Permission Control")
+                                        .score(0.91)
+                                        .build()
+                        )
+                )
+        ));
+
+        AiChatResponse response = aiChatService.chat(MESSAGE, SESSION_ID, USER_ID, false);
+
+        assertThat(response.getToolStatus()).isEqualTo("success");
+        assertThat(response.getUsage()).isNotNull();
+        assertThat(response.getUsage().getResponseId()).isEqualTo("resp-1");
+        assertThat(response.getUsage().getModel()).isEqualTo("qwen-plus");
+        assertThat(response.getUsage().getPromptTokens()).isEqualTo(120);
+        assertThat(response.getUsage().getCompletionTokens()).isEqualTo(45);
+        assertThat(response.getUsage().getTotalTokens()).isEqualTo(165);
+
+        assertThat(response.getRetrieval()).isNotNull();
+        assertThat(response.getRetrieval().isRetrievalApplied()).isTrue();
+        assertThat(response.getRetrieval().getKnowledgeBase()).isEqualTo("system");
+        assertThat(response.getRetrieval().getFilterExpression()).isEqualTo("moduleCode == 'system'");
+        assertThat(response.getRetrieval().getTopK()).isEqualTo(4);
+        assertThat(response.getRetrieval().getSimilarityThreshold()).isEqualTo(0.75);
+        assertThat(response.getRetrieval().getRetrievedCount()).isEqualTo(1);
+        assertThat(response.getRetrieval().getDocuments()).hasSize(1);
+        assertThat(response.getRetrieval().getDocuments().get(0).getId()).isEqualTo("doc-1");
+        assertThat(response.getRetrieval().getDocuments().get(0).getTitle()).isEqualTo("Permission Control");
+        assertThat(response.getRetrieval().getDocuments().get(0).getScore()).isEqualTo(0.91);
+        assertThat(response.getRetrieval().getDocuments().get(0).getSnippet()).contains("Spring Security");
+
+        verify(aiMetricsService).recordChat(eq("order"), eq("normal"), eq("success"), any(), anyLong());
+    }
+
     private ChatClientResponse chatClientResponse(String json) {
         return new ChatClientResponse(
                 new ChatResponse(List.of(new Generation(new AssistantMessage(json)))),
                 Map.of()
+        );
+    }
+
+    private ChatClientResponse chatClientResponse(String json,
+                                                  ChatResponseMetadata metadata,
+                                                  Map<String, Object> context) {
+        return new ChatClientResponse(
+                new ChatResponse(List.of(new Generation(new AssistantMessage(json))), metadata),
+                context
         );
     }
 }
