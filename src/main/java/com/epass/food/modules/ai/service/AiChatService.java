@@ -5,4 +5,6 @@ import com.epass.food.modules.ai.dto.AiChatResponse;
 public interface AiChatService {
 
     AiChatResponse chat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder);
+
+    void clearSession(String sessionId, Long currentUserId);
 }

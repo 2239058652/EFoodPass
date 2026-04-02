@@ -91,6 +91,18 @@ public class AiConversationMemoryService {
         refreshSummary(turnsKey, summaryKey, ttl);
     }
 
+    public void clearSession(Long userId, String sessionId) {
+        if (userId == null || !StringUtils.hasText(sessionId)) {
+            return;
+        }
+
+        stringRedisTemplate.delete(List.of(
+                buildTurnsKey(userId, sessionId),
+                buildSceneKey(userId, sessionId),
+                buildSummaryKey(userId, sessionId)
+        ));
+    }
+
     private String buildTurnsKey(Long userId, String sessionId) {
         return "ai:conversation:" + userId + ":" + sessionId + ":turns";
     }

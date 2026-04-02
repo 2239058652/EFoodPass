@@ -14,6 +14,7 @@ import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
 
 import java.util.EnumMap;
 import java.util.List;
@@ -72,6 +73,14 @@ public class AiChatServiceImpl implements AiChatService {
         );
     }
 
+    @Override
+    public void clearSession(String sessionId, Long currentUserId) {
+        if (!StringUtils.hasText(sessionId)) {
+            throw new BusinessException(400, "sessionId 不能为空");
+        }
+        conversationMemoryService.clearSession(currentUserId, sessionId.trim());
+    }
+
     private AiPromptPlan buildPromptByScene(AiSceneType sceneType, AiSceneRequestContext context) {
         AiSceneHandler sceneHandler = sceneHandlerMap.get(sceneType);
         if (sceneHandler == null) {
@@ -112,7 +121,7 @@ public class AiChatServiceImpl implements AiChatService {
         AiConversationMemoryService.ConversationPromptContext promptContext =
                 conversationMemoryService.getPromptContext(currentUserId, sessionId);
 
-        boolean hasSummary = promptContext.summary() != null && !promptContext.summary().isBlank();
+        boolean hasSummary = StringUtils.hasText(promptContext.summary());
         boolean hasRecentTurns = !promptContext.recentTurns().isEmpty();
         if (!hasSummary && !hasRecentTurns) {
             return basePrompt;
