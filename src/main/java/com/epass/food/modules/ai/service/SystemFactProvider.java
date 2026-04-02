@@ -26,5 +26,4 @@ public class SystemFactProvider {
                 %s
                 """.formatted(moduleFacts);
     }
-
 }

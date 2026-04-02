@@ -8,6 +8,7 @@ import com.epass.food.modules.ai.dto.AiSceneType;
 import org.springframework.stereotype.Service;
 
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class GeneralAiSceneService implements AiSceneHandler {
@@ -29,16 +30,17 @@ public class GeneralAiSceneService implements AiSceneHandler {
                 """
                         %s
 
-                        你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                        JSON 格式如下：
-                        {
-                          "content": "给用户的中文回答"
-                        }
-                """.formatted(businessContextProvider.buildGeneralAssistantPrompt()),
+                        你现在是 EFoodPass 的通用助手。
+                        请优先基于当前项目的真实业务事实回答问题。
+                        如果问题超出已知项目信息，请明确说明，不要编造。
+                        """.formatted(businessContextProvider.buildGeneralAssistantPrompt()),
                 AiAnswerType.NORMAL,
                 true,
                 resolveAction(context.message()),
-                new AiDisplayCard("通用助手", "general", "已基于当前项目通用事实生成回答。", List.of())
+                new AiDisplayCard("通用助手", "general", "已基于当前项目通用事实生成回答。", List.of()),
+                new Object[0],
+                Map.of(),
+                Map.of(AiAdvisorContextKeys.STRUCTURED_FIELDS, List.of("content"))
         );
     }
 

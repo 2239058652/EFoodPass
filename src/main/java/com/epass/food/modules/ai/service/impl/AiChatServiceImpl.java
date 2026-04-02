@@ -22,6 +22,7 @@ import com.epass.food.modules.ai.service.AiSceneHandler;
 import com.epass.food.modules.ai.service.AiStructuredOutputAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
@@ -29,6 +30,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
 
+import java.util.ArrayList;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
@@ -117,13 +119,14 @@ public class AiChatServiceImpl implements AiChatService {
         SceneRuntime runtime = prepareRuntime(message, resolvedSessionId, currentUserId, canViewAnyOrder);
         String streamPrompt = runtime.promptPlan.prompt() + """
 
-                
                 本次是流式输出。
                 直接连续输出最终给用户看的中文回答正文，不要输出 JSON，不要输出字段名，不要解释输出格式。
                 """;
 
         var requestSpec = buildBaseRequest(runtime, streamPrompt)
-                .advisors(spec -> spec.advisors(conversationMemoryAdvisor).params(buildMemoryAdvisorParams(runtime.promptContext)));
+                .advisors(spec -> spec
+                        .advisors(buildStreamAdvisors(runtime))
+                        .params(buildMemoryAdvisorParams(runtime.promptContext)));
 
         StringBuilder assistantContent = new StringBuilder();
         String scene = runtime.sceneResolution.sceneType().name().toLowerCase();
@@ -191,7 +194,7 @@ public class AiChatServiceImpl implements AiChatService {
     private ChatClient.ChatClientRequestSpec buildStructuredRequest(SceneRuntime runtime) {
         return buildBaseRequest(runtime, runtime.promptPlan.prompt())
                 .advisors(spec -> spec
-                        .advisors(conversationMemoryAdvisor, structuredOutputAdvisor)
+                        .advisors(buildStructuredAdvisors(runtime))
                         .params(buildAdvisorParams(runtime.promptPlan, runtime.promptContext)));
     }
 
@@ -207,6 +210,25 @@ public class AiChatServiceImpl implements AiChatService {
             }
         }
         return requestSpec;
+    }
+
+    private Advisor[] buildStructuredAdvisors(SceneRuntime runtime) {
+        List<Advisor> advisors = new ArrayList<>();
+        advisors.add(conversationMemoryAdvisor);
+        advisors.add(structuredOutputAdvisor);
+        if (runtime.promptPlan.hasAdvisors()) {
+            advisors.addAll(List.of(runtime.promptPlan.advisors()));
+        }
+        return advisors.toArray(Advisor[]::new);
+    }
+
+    private Advisor[] buildStreamAdvisors(SceneRuntime runtime) {
+        List<Advisor> advisors = new ArrayList<>();
+        advisors.add(conversationMemoryAdvisor);
+        if (runtime.promptPlan.hasAdvisors()) {
+            advisors.addAll(List.of(runtime.promptPlan.advisors()));
+        }
+        return advisors.toArray(Advisor[]::new);
     }
 
     private AiPromptPlan buildPromptByScene(AiSceneType sceneType, AiSceneRequestContext context) {
