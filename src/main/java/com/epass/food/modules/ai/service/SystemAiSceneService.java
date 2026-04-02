@@ -20,13 +20,16 @@ public class SystemAiSceneService implements AiSceneHandler {
     private final BusinessContextProvider businessContextProvider;
     private final SystemModuleCatalog systemModuleCatalog;
     private final QuestionAnswerAdvisor systemKnowledgeAdvisor;
+    private final SystemKnowledgeRagProperties ragProperties;
 
     public SystemAiSceneService(BusinessContextProvider businessContextProvider,
                                 SystemModuleCatalog systemModuleCatalog,
-                                QuestionAnswerAdvisor systemKnowledgeAdvisor) {
+                                QuestionAnswerAdvisor systemKnowledgeAdvisor,
+                                SystemKnowledgeRagProperties ragProperties) {
         this.businessContextProvider = businessContextProvider;
         this.systemModuleCatalog = systemModuleCatalog;
         this.systemKnowledgeAdvisor = systemKnowledgeAdvisor;
+        this.ragProperties = ragProperties;
     }
 
     @Override
@@ -70,8 +73,10 @@ public class SystemAiSceneService implements AiSceneHandler {
                 "system-modules",
                 "当前卡片展示系统核心模块清单，本场景回答会先检索项目知识库。",
                 List.of(
+                        new AiDisplayField("知识库", "system"),
                         new AiDisplayField("检索范围", retrievalScope),
-                        new AiDisplayField("知识库", "system")
+                        new AiDisplayField("TopK", String.valueOf(ragProperties.getTopK())),
+                        new AiDisplayField("相似度阈值", String.valueOf(ragProperties.getSimilarityThreshold()))
                 )
         );
     }
@@ -79,6 +84,9 @@ public class SystemAiSceneService implements AiSceneHandler {
     private Map<String, Object> buildAdvisorParams(String message) {
         Map<String, Object> params = new LinkedHashMap<>();
         params.put(AiAdvisorContextKeys.STRUCTURED_FIELDS, List.of("content"));
+        params.put(AiAdvisorContextKeys.RAG_KNOWLEDGE_BASE, "system");
+        params.put(AiAdvisorContextKeys.RAG_TOP_K, ragProperties.getTopK());
+        params.put(AiAdvisorContextKeys.RAG_SIMILARITY_THRESHOLD, ragProperties.getSimilarityThreshold());
 
         String filterExpression = resolveFilterExpression(message);
         if (filterExpression != null) {
@@ -97,8 +105,8 @@ public class SystemAiSceneService implements AiSceneHandler {
         if (normalized.contains("auth") || message.contains("登录") || message.contains("当前用户") || normalized.contains("token")) {
             return "moduleCode == 'auth'";
         }
-        if (message.contains("权限") || message.contains("角色") || message.contains("用户") || normalized.contains("security")
-                || normalized.contains("preauthorize")) {
+        if (message.contains("权限") || message.contains("角色") || message.contains("用户")
+                || normalized.contains("security") || normalized.contains("preauthorize")) {
             return "moduleCode == 'system'";
         }
         if (message.contains("分类")) {

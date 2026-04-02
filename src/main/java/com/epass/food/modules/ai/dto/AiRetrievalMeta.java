@@ -11,6 +11,14 @@ public class AiRetrievalMeta {
 
     private boolean retrievalApplied;
 
+    private String knowledgeBase;
+
+    private String filterExpression;
+
+    private Integer topK;
+
+    private Double similarityThreshold;
+
     private int retrievedCount;
 
     private List<AiRetrievedDocument> documents;

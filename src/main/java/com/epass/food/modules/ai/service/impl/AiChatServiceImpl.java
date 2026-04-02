@@ -94,7 +94,7 @@ public class AiChatServiceImpl implements AiChatService {
         String finalNextAction = resolveNextAction(runtime.promptPlan.nextAction(), finalAnswerType);
         AiDisplayCard finalCard = resolveCard(runtime.promptPlan.card(), finalAnswerType);
         AiModelUsage usage = extractUsage(chatClientResponse.chatResponse());
-        AiRetrievalMeta retrievalMeta = extractRetrievalMeta(chatClientResponse);
+        AiRetrievalMeta retrievalMeta = extractRetrievalMeta(chatClientResponse, runtime.promptPlan);
 
         conversationMemoryService.appendTurn(
                 currentUserId,
@@ -381,14 +381,21 @@ public class AiChatServiceImpl implements AiChatService {
         );
     }
 
-    private AiRetrievalMeta extractRetrievalMeta(ChatClientResponse chatClientResponse) {
+    private AiRetrievalMeta extractRetrievalMeta(ChatClientResponse chatClientResponse, AiPromptPlan promptPlan) {
+        Map<String, Object> advisorParams = promptPlan == null ? Map.of() : promptPlan.advisorParams();
+        boolean retrievalApplied = advisorParams.containsKey(AiAdvisorContextKeys.RAG_KNOWLEDGE_BASE);
+        String knowledgeBase = stringValue(advisorParams.get(AiAdvisorContextKeys.RAG_KNOWLEDGE_BASE));
+        String filterExpression = stringValue(advisorParams.get(AiAdvisorContextKeys.RAG_FILTER_EXPRESSION));
+        Integer topK = integerValue(advisorParams.get(AiAdvisorContextKeys.RAG_TOP_K));
+        Double similarityThreshold = doubleValue(advisorParams.get(AiAdvisorContextKeys.RAG_SIMILARITY_THRESHOLD));
+
         if (chatClientResponse == null || chatClientResponse.context() == null) {
-            return null;
+            return new AiRetrievalMeta(retrievalApplied, knowledgeBase, filterExpression, topK, similarityThreshold, 0, List.of());
         }
 
         Object retrieved = chatClientResponse.context().get(QuestionAnswerAdvisor.RETRIEVED_DOCUMENTS);
         if (!(retrieved instanceof List<?> retrievedDocuments)) {
-            return new AiRetrievalMeta(false, 0, List.of());
+            return new AiRetrievalMeta(retrievalApplied, knowledgeBase, filterExpression, topK, similarityThreshold, 0, List.of());
         }
 
         List<AiRetrievedDocument> documents = retrievedDocuments.stream()
@@ -398,7 +405,7 @@ public class AiChatServiceImpl implements AiChatService {
                 .filter(Objects::nonNull)
                 .toList();
 
-        return new AiRetrievalMeta(!documents.isEmpty(), documents.size(), documents);
+        return new AiRetrievalMeta(retrievalApplied, knowledgeBase, filterExpression, topK, similarityThreshold, documents.size(), documents);
     }
 
     private AiRetrievedDocument mapRetrievedDocument(Document document) {
@@ -406,8 +413,10 @@ public class AiChatServiceImpl implements AiChatService {
             return null;
         }
 
-        String title = valueAsString(document.getMetadata().getOrDefault("title",
-                document.getMetadata().getOrDefault("documentId", document.getId())));
+        String title = stringValue(document.getMetadata().getOrDefault(
+                "title",
+                document.getMetadata().getOrDefault("documentId", document.getId())
+        ));
         String snippet = buildSnippet(document.getText());
         return new AiRetrievedDocument(
                 document.getId(),
@@ -417,8 +426,28 @@ public class AiChatServiceImpl implements AiChatService {
         );
     }
 
-    private String valueAsString(Object value) {
+    private String stringValue(Object value) {
         return value == null ? null : String.valueOf(value);
+    }
+
+    private Integer integerValue(Object value) {
+        if (value instanceof Integer integer) {
+            return integer;
+        }
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        return null;
+    }
+
+    private Double doubleValue(Object value) {
+        if (value instanceof Double d) {
+            return d;
+        }
+        if (value instanceof Number number) {
+            return number.doubleValue();
+        }
+        return null;
     }
 
     private String buildSnippet(String text) {
