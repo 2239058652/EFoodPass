@@ -1,6 +1,5 @@
 package com.epass.food.modules.ai.service;
 
-import com.epass.food.common.exception.BusinessException;
 import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiDisplayField;
@@ -22,18 +21,18 @@ public class ItemAiSceneService implements AiSceneHandler {
     private final ItemFactProvider itemFactProvider;
     private final ItemQuestionClassifier itemQuestionClassifier;
     private final ItemEntityReferenceResolver itemEntityReferenceResolver;
-    private final ItemAiSupportService itemAiSupportService;
+    private final ItemAiTools itemAiTools;
 
     public ItemAiSceneService(BusinessContextProvider businessContextProvider,
                               ItemFactProvider itemFactProvider,
                               ItemQuestionClassifier itemQuestionClassifier,
                               ItemEntityReferenceResolver itemEntityReferenceResolver,
-                              ItemAiSupportService itemAiSupportService) {
+                              ItemAiTools itemAiTools) {
         this.businessContextProvider = businessContextProvider;
         this.itemFactProvider = itemFactProvider;
         this.itemQuestionClassifier = itemQuestionClassifier;
         this.itemEntityReferenceResolver = itemEntityReferenceResolver;
-        this.itemAiSupportService = itemAiSupportService;
+        this.itemAiTools = itemAiTools;
     }
 
     @Override
@@ -59,7 +58,12 @@ public class ItemAiSceneService implements AiSceneHandler {
                     AiAnswerType.NORMAL,
                     true,
                     "view_item_module",
-                    new AiDisplayCard("菜品助手", "item", "当前回答围绕菜品领域的一般问题生成。", List.of())
+                    new AiDisplayCard(
+                            "菜品助手",
+                            "item",
+                            "当前回答围绕菜品领域的一般问题生成。",
+                            List.of()
+                    )
             );
         };
     }
@@ -72,76 +76,53 @@ public class ItemAiSceneService implements AiSceneHandler {
                     AiAnswerType.NORMAL,
                     true,
                     "ask_more_details",
-                    new AiDisplayCard("菜品助手", "item", "未能从问题中提取菜品编号。", List.of())
+                    new AiDisplayCard(
+                            "菜品查询",
+                            "item-detail",
+                            "未能从问题中提取菜品编号。",
+                            List.of()
+                    )
             );
         }
 
-        try {
-            String prompt = """
-                    %s
+        String prompt = """
+                %s
 
-                    下面是菜品领域的真实业务事实：
-                    %s
+                下面是菜品领域的真实业务事实：
+                %s
 
-                    下面是指定菜品的真实详情：
-                    %s
+                当前用户问题的查询重点是：
+                %s
 
-                    当前用户问题的查询重点是：
-                    %s
+                你现在是 EFoodPass 的菜品助手。
+                用户已经给出了明确的菜品ID。只要问题涉及菜品状态、库存、分类或菜品详情，
+                你就应该调用工具 `getItemDetail` 获取真实数据，不要根据静态事实猜测动态结果。
 
-                    你现在是 EFoodPass 的菜品助手。
-                    请优先围绕这个查询重点回答，不要展开无关内容，也不要编造。
+                如果工具返回：
+                1. status = success：基于真实菜品数据回答
+                2. status = not_found：明确说明菜品不存在
 
-                    你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                    JSON 格式如下：
-                    {
-                      "content": "给用户的中文回答"
-                    }
-                    """.formatted(
-                    businessContextProvider.buildCommonFacts(),
-                    itemFactProvider.buildItemFacts(),
-                    itemAiSupportService.buildItemDetailFacts(reference.getEntityId()),
-                    buildIntentHint(reference)
-            );
+                不要编造任何菜品详情。
+                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
+                JSON 格式如下：
+                {
+                  "content": "给用户的中文回答"
+                }
+                """.formatted(
+                businessContextProvider.buildCommonFacts(),
+                itemFactProvider.buildItemFacts(),
+                buildIntentHint(reference)
+        );
 
-            return new AiPromptPlan(
-                    prompt,
-                    AiAnswerType.NORMAL,
-                    true,
-                    resolveDetailAction(reference),
-                    buildDetailCard(reference)
-            );
-        } catch (BusinessException e) {
-            String prompt = """
-                    %s
-
-                    下面是菜品领域的真实业务事实：
-                    %s
-
-                    当前有一条真实业务限制信息：
-                    - 无法加载该菜品详情，原因：菜品不存在
-
-                    你现在是 EFoodPass 的菜品助手。
-                    请基于这条真实限制信息，用简洁中文说明情况，不要编造任何菜品详情。
-
-                    你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                    JSON 格式如下：
-                    {
-                      "content": "给用户的中文回答"
-                    }
-                    """.formatted(
-                    businessContextProvider.buildCommonFacts(),
-                    itemFactProvider.buildItemFacts()
-            );
-
-            return new AiPromptPlan(
-                    prompt,
-                    AiAnswerType.NOT_FOUND,
-                    true,
-                    "ask_more_details",
-                    new AiDisplayCard("未找到菜品", "item-not-found", "当前查询的菜品不存在，请确认菜品编号。", List.of())
-            );
-        }
+        return new AiPromptPlan(
+                prompt,
+                AiAnswerType.NORMAL,
+                true,
+                resolveDetailAction(reference),
+                buildDetailToolCard(reference),
+                new Object[]{itemAiTools},
+                java.util.Map.of()
+        );
     }
 
     private String buildStatusPrompt() {
@@ -152,7 +133,7 @@ public class ItemAiSceneService implements AiSceneHandler {
                 %s
 
                 当前问题更偏向菜品状态规则说明。
-                请严格基于这些真实事实回答，不要编造。
+                这类问题优先基于静态业务事实回答，不需要调用工具。
 
                 你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
                 JSON 格式如下：
@@ -215,32 +196,16 @@ public class ItemAiSceneService implements AiSceneHandler {
         );
     }
 
-    private AiDisplayCard buildDetailCard(AiEntityReference reference) {
-        if (reference.getEntityId() == null) {
-            return new AiDisplayCard("菜品详情", "item-detail", "未能从问题中提取菜品编号。", List.of());
-        }
-
-        try {
-            var item = itemAiSupportService.getItemDetail(reference.getEntityId());
-
-            return new AiDisplayCard(
-                    "菜品详情",
-                    "item-detail",
-                    "当前卡片展示指定菜品的关键字段。",
-                    List.of(
-                            new AiDisplayField("菜品ID", String.valueOf(item.getId())),
-                            new AiDisplayField("菜品名称", item.getName()),
-                            new AiDisplayField("分类ID", String.valueOf(item.getCategoryId())),
-                            new AiDisplayField("当前价格", String.valueOf(item.getPrice())),
-                            new AiDisplayField("当前库存", String.valueOf(item.getStock())),
-                            new AiDisplayField(
-                                    "上架状态",
-                                    item.getIsOnSale() + "（" + FoodItemSaleStatus.getLabelByCode(item.getIsOnSale()) + "）"
-                            )
-                    )
-            );
-        } catch (BusinessException e) {
-            return new AiDisplayCard("菜品详情", "item-detail", "当前无法展示菜品关键字段。", List.of());
-        }
+    private AiDisplayCard buildDetailToolCard(AiEntityReference reference) {
+        return new AiDisplayCard(
+                "菜品详情查询",
+                "item-detail",
+                "这类问题会由模型按需调用菜品详情工具获取真实数据。",
+                List.of(
+                        new AiDisplayField("菜品ID", String.valueOf(reference.getEntityId())),
+                        new AiDisplayField("查询重点", buildIntentHint(reference)),
+                        new AiDisplayField("数据来源", "getItemDetail 工具")
+                )
+        );
     }
 }
