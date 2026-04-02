@@ -1,5 +1,6 @@
 package com.epass.food.modules.ai.service;
 
+import com.epass.food.common.exception.BusinessException;
 import com.epass.food.modules.ai.dto.AiConversationMessage;
 import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
@@ -20,8 +21,10 @@ import org.springframework.data.redis.core.ZSetOperations;
 import java.time.Duration;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -280,5 +283,23 @@ class AiConversationMemoryServiceTest {
                 .containsExactly("session-3", "session-2", "session-1");
         assertThat(sessions).extracting(AiConversationSessionSummary::getUpdatedAt)
                 .containsExactly(3000L, 2000L, 1000L);
+    }
+
+    @Test
+    void getLastSceneShouldReturnEmptyWhenStoredValueIsInvalid() {
+        when(valueOperations.get("ai:conversation:1:session-1:scene")).thenReturn("INVALID_SCENE");
+
+        Optional<AiSceneType> scene = conversationMemoryService.getLastScene(USER_ID, SESSION_ID);
+
+        assertThat(scene).isEmpty();
+    }
+
+    @Test
+    void getSessionDetailShouldThrowWhenSessionMetaDoesNotExist() {
+        when(valueOperations.get(anyString())).thenReturn(null);
+
+        assertThatThrownBy(() -> conversationMemoryService.getSessionDetail(USER_ID, SESSION_ID, 1, 20))
+                .isInstanceOf(BusinessException.class)
+                .hasMessageContaining("会话");
     }
 }

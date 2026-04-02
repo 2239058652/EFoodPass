@@ -2,6 +2,7 @@ package com.epass.food.modules.ai.controller;
 
 import com.epass.food.config.security.LoginUser;
 import com.epass.food.modules.ai.dto.AiChatResponse;
+import com.epass.food.modules.ai.dto.AiChatStreamChunk;
 import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
@@ -20,13 +21,16 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.validation.beanvalidation.LocalValidatorFactoryBean;
+import reactor.core.publisher.Flux;
 
 import java.util.Arrays;
 import java.util.List;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -41,6 +45,7 @@ class AiChatControllerTest {
 
     private MockMvc mockMvc;
     private ObjectMapper objectMapper;
+    private AiChatController controller;
 
     @BeforeEach
     void setUp() {
@@ -48,7 +53,7 @@ class AiChatControllerTest {
         LocalValidatorFactoryBean validator = new LocalValidatorFactoryBean();
         validator.afterPropertiesSet();
 
-        AiChatController controller = new AiChatController(aiChatService);
+        controller = new AiChatController(aiChatService);
         mockMvc = MockMvcBuilders.standaloneSetup(controller)
                 .setMessageConverters(new MappingJackson2HttpMessageConverter(objectMapper))
                 .setValidator(validator)
@@ -167,6 +172,60 @@ class AiChatControllerTest {
                 .andExpect(jsonPath("$.code").value(200));
 
         verify(aiChatService).renameSession("session-9", "Renamed Session", 11L);
+    }
+
+    @Test
+    void renameSessionShouldRejectBlankTitle() throws Exception {
+        mockMvc.perform(put("/ai/chat/session/session-9/title")
+                        .principal(loginAuthentication(11L))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "title": "   "
+                                }
+                                """))
+                .andExpect(status().isBadRequest());
+
+        verifyNoInteractions(aiChatService);
+    }
+
+    @Test
+    void clearSessionShouldPassCurrentUser() throws Exception {
+        mockMvc.perform(delete("/ai/chat/session/session-4")
+                        .principal(loginAuthentication(12L)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.code").value(200));
+
+        verify(aiChatService).clearSession("session-4", 12L);
+    }
+
+    @Test
+    void streamChatShouldPassAuthenticatedUserAndPermissionFlag() {
+        when(aiChatService.streamChat("order stream", "session-2", 13L, true))
+                .thenReturn(Flux.just(
+                        new AiChatStreamChunk("session-2", "order", "", false),
+                        new AiChatStreamChunk("session-2", "order", "partial", false),
+                        new AiChatStreamChunk("session-2", "order", "", true)
+                ));
+
+        List<AiChatStreamChunk> chunks = controller.streamChat(
+                request("order stream", "session-2"),
+                loginAuthentication(13L, "food:order:detail")
+        ).collectList().block();
+
+        assertThat(chunks).isNotNull();
+        assertThat(chunks).hasSize(3);
+        assertThat(chunks.get(1).getContent()).isEqualTo("partial");
+        assertThat(chunks.get(2).isDone()).isTrue();
+
+        verify(aiChatService).streamChat("order stream", "session-2", 13L, true);
+    }
+
+    private com.epass.food.modules.ai.dto.AiChatRequest request(String message, String sessionId) {
+        com.epass.food.modules.ai.dto.AiChatRequest request = new com.epass.food.modules.ai.dto.AiChatRequest();
+        request.setMessage(message);
+        request.setSessionId(sessionId);
+        return request;
     }
 
     private UsernamePasswordAuthenticationToken loginAuthentication(Long userId, String... authorities) {
