@@ -11,7 +11,9 @@ import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import com.epass.food.modules.ai.dto.AiStructuredReply;
+import com.epass.food.modules.ai.service.AiAdvisorContextKeys;
 import com.epass.food.modules.ai.service.AiChatService;
+import com.epass.food.modules.ai.service.AiConversationMemoryAdvisor;
 import com.epass.food.modules.ai.service.AiConversationMemoryService;
 import com.epass.food.modules.ai.service.AiSceneClassifier;
 import com.epass.food.modules.ai.service.AiSceneHandler;
@@ -22,6 +24,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 import java.util.EnumMap;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -33,17 +36,20 @@ public class AiChatServiceImpl implements AiChatService {
     private final AiConversationMemoryService conversationMemoryService;
     private final Map<AiSceneType, AiSceneHandler> sceneHandlerMap;
     private final AiStructuredOutputAdvisor structuredOutputAdvisor;
+    private final AiConversationMemoryAdvisor conversationMemoryAdvisor;
 
     public AiChatServiceImpl(ChatClient.Builder chatClientBuilder,
                              AiSceneClassifier aiSceneClassifier,
                              AiConversationMemoryService conversationMemoryService,
                              List<AiSceneHandler> sceneHandlers,
-                             AiStructuredOutputAdvisor structuredOutputAdvisor) {
+                             AiStructuredOutputAdvisor structuredOutputAdvisor,
+                             AiConversationMemoryAdvisor conversationMemoryAdvisor) {
         this.chatClient = chatClientBuilder.build();
         this.aiSceneClassifier = aiSceneClassifier;
         this.conversationMemoryService = conversationMemoryService;
         this.sceneHandlerMap = buildSceneHandlerMap(sceneHandlers);
         this.structuredOutputAdvisor = structuredOutputAdvisor;
+        this.conversationMemoryAdvisor = conversationMemoryAdvisor;
     }
 
     @Override
@@ -62,12 +68,13 @@ public class AiChatServiceImpl implements AiChatService {
                 canViewAnyOrder
         );
         AiPromptPlan promptPlan = buildPromptByScene(sceneResolution.sceneType(), context);
-        String promptWithHistory = appendConversationHistory(promptPlan.prompt(), promptContext);
 
         var requestSpec = chatClient.prompt()
-                .system(promptWithHistory)
+                .system(promptPlan.prompt())
                 .user(message)
-                .advisors(spec -> spec.advisors(structuredOutputAdvisor).params(promptPlan.advisorParams()));
+                .advisors(spec -> spec
+                        .advisors(conversationMemoryAdvisor, structuredOutputAdvisor)
+                        .params(buildAdvisorParams(promptPlan, promptContext)));
 
         if (promptPlan.hasTools()) {
             requestSpec = requestSpec.tools(promptPlan.tools());
@@ -178,39 +185,16 @@ public class AiChatServiceImpl implements AiChatService {
                 || trimmed.contains("还有");
     }
 
-    private String appendConversationHistory(String basePrompt,
-                                             AiConversationMemoryService.ConversationPromptContext promptContext) {
-        boolean hasSummary = StringUtils.hasText(promptContext.summary());
-        boolean hasRecentTurns = !promptContext.recentTurns().isEmpty();
-        if (!hasSummary && !hasRecentTurns) {
-            return basePrompt;
+    private Map<String, Object> buildAdvisorParams(AiPromptPlan promptPlan,
+                                                   AiConversationMemoryService.ConversationPromptContext promptContext) {
+        Map<String, Object> params = new HashMap<>(promptPlan.advisorParams());
+        if (StringUtils.hasText(promptContext.summary())) {
+            params.put(AiAdvisorContextKeys.MEMORY_SUMMARY, promptContext.summary());
         }
-
-        StringBuilder historyBuilder = new StringBuilder();
-        historyBuilder.append("\n\n下面是与当前会话相关的上下文，仅用于辅助理解当前问题：\n");
-        if (hasSummary) {
-            historyBuilder.append(promptContext.summary()).append("\n");
+        if (!promptContext.recentTurns().isEmpty()) {
+            params.put(AiAdvisorContextKeys.MEMORY_RECENT_TURNS, promptContext.recentTurns());
         }
-
-        if (hasRecentTurns) {
-            historyBuilder.append("最近几轮对话：\n");
-        }
-
-        int index = 1;
-        for (AiConversationMemoryService.ConversationTurn turn : promptContext.recentTurns()) {
-            historyBuilder.append(index)
-                    .append(". 用户：")
-                    .append(turn.userMessage())
-                    .append("\n");
-            historyBuilder.append(index)
-                    .append(". 助手：")
-                    .append(turn.assistantMessage())
-                    .append("\n");
-            index++;
-        }
-
-        historyBuilder.append("回答当前问题时优先依据本轮问题；如果历史上下文与本轮冲突，以本轮为准。");
-        return basePrompt + historyBuilder;
+        return params;
     }
 
     private AiConversationMeta buildConversationMeta(
