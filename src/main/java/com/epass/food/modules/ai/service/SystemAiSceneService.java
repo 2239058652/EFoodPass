@@ -6,9 +6,11 @@ import com.epass.food.modules.ai.dto.AiDisplayField;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
+import org.springframework.ai.chat.client.advisor.api.Advisor;
 import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.stereotype.Service;
 
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -39,11 +41,11 @@ public class SystemAiSceneService implements AiSceneHandler {
                 AiAnswerType.NORMAL,
                 true,
                 "view_system_module",
-                buildCard(),
+                buildCard(context.message()),
                 new Object[0],
                 Map.of(),
-                Map.of(AiAdvisorContextKeys.STRUCTURED_FIELDS, List.of("content")),
-                new org.springframework.ai.chat.client.advisor.api.Advisor[]{systemKnowledgeAdvisor}
+                buildAdvisorParams(context.message()),
+                new Advisor[]{systemKnowledgeAdvisor}
         );
     }
 
@@ -59,14 +61,58 @@ public class SystemAiSceneService implements AiSceneHandler {
                 """.formatted(businessContextProvider.buildCommonFacts());
     }
 
-    private AiDisplayCard buildCard() {
+    private AiDisplayCard buildCard(String message) {
+        String filterExpression = resolveFilterExpression(message);
+        String retrievalScope = filterExpression == null ? "全量系统知识库" : "过滤检索: " + filterExpression;
+
         return new AiDisplayCard(
                 "系统模块",
                 "system-modules",
                 "当前卡片展示系统核心模块清单，本场景回答会先检索项目知识库。",
-                systemModuleCatalog.getModules().stream()
-                        .map(module -> new AiDisplayField(module.code(), module.description()))
-                        .toList()
+                List.of(
+                        new AiDisplayField("检索范围", retrievalScope),
+                        new AiDisplayField("知识库", "system")
+                )
         );
+    }
+
+    private Map<String, Object> buildAdvisorParams(String message) {
+        Map<String, Object> params = new LinkedHashMap<>();
+        params.put(AiAdvisorContextKeys.STRUCTURED_FIELDS, List.of("content"));
+
+        String filterExpression = resolveFilterExpression(message);
+        if (filterExpression != null) {
+            params.put(QuestionAnswerAdvisor.FILTER_EXPRESSION, filterExpression);
+            params.put(AiAdvisorContextKeys.RAG_FILTER_EXPRESSION, filterExpression);
+        }
+        return params;
+    }
+
+    private String resolveFilterExpression(String message) {
+        if (message == null || message.isBlank()) {
+            return null;
+        }
+
+        String normalized = message.toLowerCase();
+        if (normalized.contains("auth") || message.contains("登录") || message.contains("当前用户") || normalized.contains("token")) {
+            return "moduleCode == 'auth'";
+        }
+        if (message.contains("权限") || message.contains("角色") || message.contains("用户") || normalized.contains("security")
+                || normalized.contains("preauthorize")) {
+            return "moduleCode == 'system'";
+        }
+        if (message.contains("分类")) {
+            return "moduleCode == 'food/category'";
+        }
+        if (message.contains("菜品")) {
+            return "moduleCode == 'food/item'";
+        }
+        if (message.contains("订单")) {
+            return "moduleCode == 'food/order'";
+        }
+        if (message.contains("库存")) {
+            return "moduleCode == 'food/stock'";
+        }
+        return null;
     }
 }

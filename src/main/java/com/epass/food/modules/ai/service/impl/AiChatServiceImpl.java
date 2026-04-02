@@ -406,7 +406,8 @@ public class AiChatServiceImpl implements AiChatService {
             return null;
         }
 
-        String title = valueAsString(document.getMetadata().getOrDefault("documentId", document.getId()));
+        String title = valueAsString(document.getMetadata().getOrDefault("title",
+                document.getMetadata().getOrDefault("documentId", document.getId())));
         String snippet = buildSnippet(document.getText());
         return new AiRetrievedDocument(
                 document.getId(),
