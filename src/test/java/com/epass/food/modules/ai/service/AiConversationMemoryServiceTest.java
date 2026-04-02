@@ -3,6 +3,7 @@ package com.epass.food.modules.ai.service;
 import com.epass.food.modules.ai.dto.AiConversationMessage;
 import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
+import com.epass.food.modules.ai.dto.AiSceneType;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.json.JsonMapper;
 import org.junit.jupiter.api.BeforeEach;
@@ -17,12 +18,14 @@ import org.springframework.data.redis.core.ValueOperations;
 import org.springframework.data.redis.core.ZSetOperations;
 
 import java.time.Duration;
+import java.util.LinkedHashSet;
 import java.util.List;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
@@ -177,5 +180,105 @@ class AiConversationMemoryServiceTest {
                 "ai:conversation:1:session-1:summary",
                 "ai:conversation:1:session-1:meta"
         );
+    }
+
+    @Test
+    void appendTurnShouldUpdateSummaryMetaAndSessionIndex() throws Exception {
+        properties.setRecentTurnsForPrompt(2);
+
+        List<String> archivedTurnsAfterAppend = List.of(
+                objectMapper.writeValueAsString(new AiConversationMemoryService.ConversationTurn(
+                        "u-1", "a-1", "first user question", "first assistant answer", 1000L, 1100L
+                )),
+                objectMapper.writeValueAsString(new AiConversationMemoryService.ConversationTurn(
+                        "u-2", "a-2", "second user question", "second assistant answer", 2000L, 2100L
+                )),
+                objectMapper.writeValueAsString(new AiConversationMemoryService.ConversationTurn(
+                        "u-3", "a-3", "third user question", "third assistant answer", 3000L, 3100L
+                ))
+        );
+
+        when(valueOperations.get(anyString())).thenReturn(null);
+        when(listOperations.range(anyString(), anyLong(), anyLong())).thenAnswer(invocation -> {
+            String key = invocation.getArgument(0, String.class);
+            if (key.endsWith(":archive-turns")) {
+                return archivedTurnsAfterAppend;
+            }
+            return List.of();
+        });
+
+        conversationMemoryService.appendTurn(
+                USER_ID,
+                SESSION_ID,
+                AiSceneType.ORDER,
+                "latest order question",
+                "latest order answer",
+                4000L,
+                4100L
+        );
+
+        verify(listOperations).rightPush(eq("ai:conversation:1:session-1:prompt-turns"), anyString());
+        verify(listOperations).rightPush(eq("ai:conversation:1:session-1:archive-turns"), anyString());
+        verify(listOperations).trim("ai:conversation:1:session-1:prompt-turns", -properties.getMaxTurns(), -1);
+        verify(listOperations).trim("ai:conversation:1:session-1:archive-turns", -properties.getArchiveMaxTurns(), -1);
+        verify(zSetOperations).add("ai:conversation:1:sessions", SESSION_ID, 4100L);
+
+        ArgumentCaptor<String> keyCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<String> valueCaptor = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Duration> ttlCaptor = ArgumentCaptor.forClass(Duration.class);
+        verify(valueOperations, org.mockito.Mockito.atLeast(3)).set(keyCaptor.capture(), valueCaptor.capture(), ttlCaptor.capture());
+
+        List<String> writtenKeys = keyCaptor.getAllValues();
+        assertThat(writtenKeys).contains(
+                "ai:conversation:1:session-1:scene",
+                "ai:conversation:1:session-1:summary",
+                "ai:conversation:1:session-1:meta"
+        );
+        assertThat(ttlCaptor.getAllValues()).allMatch(duration -> duration.equals(Duration.ofHours(12)));
+
+        int summaryIndex = writtenKeys.indexOf("ai:conversation:1:session-1:summary");
+        assertThat(valueCaptor.getAllValues().get(summaryIndex)).isNotBlank();
+
+        int metaIndex = writtenKeys.lastIndexOf("ai:conversation:1:session-1:meta");
+        AiConversationSessionSummary summary = objectMapper.readValue(
+                valueCaptor.getAllValues().get(metaIndex),
+                AiConversationSessionSummary.class
+        );
+        assertThat(summary.getSessionId()).isEqualTo(SESSION_ID);
+        assertThat(summary.getScene()).isEqualTo("order");
+        assertThat(summary.getUpdatedAt()).isEqualTo(4100L);
+        assertThat(summary.getTitle()).isEqualTo("latest order question");
+        assertThat(summary.getPreview()).isNotBlank();
+    }
+
+    @Test
+    void listSessionsShouldRespectLimitAndKeepLatestOrder() throws Exception {
+        AiConversationSessionSummary summary3 = new AiConversationSessionSummary("session-3", "Title 3", "system", "preview-3", 3000L);
+        AiConversationSessionSummary summary2 = new AiConversationSessionSummary("session-2", "Title 2", "item", "preview-2", 2000L);
+        AiConversationSessionSummary summary1 = new AiConversationSessionSummary("session-1", "Title 1", "order", "preview-1", 1000L);
+
+        when(zSetOperations.reverseRange("ai:conversation:1:sessions", 0, 19))
+                .thenReturn(new LinkedHashSet<>(List.of("session-3", "session-2", "session-1")));
+        when(valueOperations.get(anyString())).thenAnswer(invocation -> {
+            String key = invocation.getArgument(0, String.class);
+            if (key.endsWith("session-3:meta")) {
+                return objectMapper.writeValueAsString(summary3);
+            }
+            if (key.endsWith("session-2:meta")) {
+                return objectMapper.writeValueAsString(summary2);
+            }
+            if (key.endsWith("session-1:meta")) {
+                return objectMapper.writeValueAsString(summary1);
+            }
+            return null;
+        });
+
+        List<AiConversationSessionSummary> sessions = conversationMemoryService.listSessions(USER_ID, 99);
+
+        verify(zSetOperations).reverseRange("ai:conversation:1:sessions", 0, 19);
+        assertThat(sessions).extracting(AiConversationSessionSummary::getSessionId)
+                .containsExactly("session-3", "session-2", "session-1");
+        assertThat(sessions).extracting(AiConversationSessionSummary::getUpdatedAt)
+                .containsExactly(3000L, 2000L, 1000L);
     }
 }
