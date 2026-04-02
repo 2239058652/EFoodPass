@@ -2,6 +2,7 @@ package com.epass.food.modules.ai.service.impl;
 
 import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiChatResponse;
+import com.epass.food.modules.ai.dto.AiChatStreamChunk;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiSceneType;
@@ -39,6 +40,7 @@ import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import reactor.core.publisher.Flux;
 
 @ExtendWith(MockitoExtension.class)
 class AiChatServiceImplTest {
@@ -59,6 +61,9 @@ class AiChatServiceImplTest {
 
     @Mock
     private ChatClient.CallResponseSpec callResponseSpec;
+
+    @Mock
+    private ChatClient.StreamResponseSpec streamResponseSpec;
 
     @Mock
     private AiSceneClassifier aiSceneClassifier;
@@ -87,7 +92,8 @@ class AiChatServiceImplTest {
         when(requestSpec.system(any(String.class))).thenReturn(requestSpec);
         when(requestSpec.user(any(String.class))).thenReturn(requestSpec);
         doReturn(requestSpec).when(requestSpec).advisors(any(Consumer.class));
-        when(requestSpec.call()).thenReturn(callResponseSpec);
+        lenient().when(requestSpec.call()).thenReturn(callResponseSpec);
+        lenient().when(requestSpec.stream()).thenReturn(streamResponseSpec);
 
         when(aiSceneHandler.sceneType()).thenReturn(AiSceneType.ORDER);
         when(aiSceneHandler.buildPlan(any())).thenReturn(new AiPromptPlan(
@@ -278,6 +284,41 @@ class AiChatServiceImplTest {
         assertThat(response.getRetrieval().getDocuments().get(0).getSnippet()).contains("Spring Security");
 
         verify(aiMetricsService).recordChat(eq("order"), eq("normal"), eq("success"), any(), anyLong());
+    }
+
+    @Test
+    void streamChatShouldEmitChunksAndPersistConversationOnCompletion() {
+        when(streamResponseSpec.content()).thenReturn(Flux.just("hello ", "world"));
+
+        List<AiChatStreamChunk> chunks = aiChatService.streamChat(MESSAGE, SESSION_ID, USER_ID, false)
+                .collectList()
+                .block();
+
+        assertThat(chunks).isNotNull();
+        assertThat(chunks).hasSize(4);
+        assertThat(chunks.get(0).getSessionId()).isEqualTo(SESSION_ID);
+        assertThat(chunks.get(0).getScene()).isEqualTo("order");
+        assertThat(chunks.get(0).getContent()).isEmpty();
+        assertThat(chunks.get(0).isDone()).isFalse();
+
+        assertThat(chunks.get(1).getContent()).isEqualTo("hello ");
+        assertThat(chunks.get(1).isDone()).isFalse();
+        assertThat(chunks.get(2).getContent()).isEqualTo("world");
+        assertThat(chunks.get(2).isDone()).isFalse();
+
+        assertThat(chunks.get(3).getContent()).isEmpty();
+        assertThat(chunks.get(3).isDone()).isTrue();
+
+        verify(conversationMemoryService).appendTurn(
+                eq(USER_ID),
+                eq(SESSION_ID),
+                eq(AiSceneType.ORDER),
+                eq(MESSAGE),
+                eq("hello world"),
+                anyLong(),
+                anyLong()
+        );
+        verify(aiMetricsService).recordStream(eq("order"), anyLong());
     }
 
     private ChatClientResponse chatClientResponse(String json) {
