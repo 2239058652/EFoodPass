@@ -10,6 +10,8 @@ import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
 import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiModelUsage;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
+import com.epass.food.modules.ai.dto.AiRetrievalMeta;
+import com.epass.food.modules.ai.dto.AiRetrievedDocument;
 import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
 import com.epass.food.modules.ai.dto.AiStructuredReply;
@@ -21,11 +23,14 @@ import com.epass.food.modules.ai.service.AiSceneClassifier;
 import com.epass.food.modules.ai.service.AiSceneHandler;
 import com.epass.food.modules.ai.service.AiStructuredOutputAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
-import org.springframework.ai.chat.client.ResponseEntity;
+import org.springframework.ai.chat.client.ChatClientResponse;
 import org.springframework.ai.chat.client.advisor.api.Advisor;
+import org.springframework.ai.chat.client.advisor.vectorstore.QuestionAnswerAdvisor;
 import org.springframework.ai.chat.metadata.ChatResponseMetadata;
 import org.springframework.ai.chat.metadata.Usage;
 import org.springframework.ai.chat.model.ChatResponse;
+import org.springframework.ai.converter.BeanOutputConverter;
+import org.springframework.ai.document.Document;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 import reactor.core.publisher.Flux;
@@ -35,6 +40,7 @@ import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class AiChatServiceImpl implements AiChatService {
@@ -68,15 +74,17 @@ public class AiChatServiceImpl implements AiChatService {
         SceneRuntime runtime = prepareRuntime(message, resolvedSessionId, currentUserId, canViewAnyOrder);
         var requestSpec = buildStructuredRequest(runtime);
 
-        ResponseEntity<ChatResponse, AiStructuredReply> responseEntity;
+        ChatClientResponse chatClientResponse;
+        AiStructuredReply reply;
         try {
-            responseEntity = requestSpec.call().responseEntity(AiStructuredReply.class);
+            chatClientResponse = requestSpec.call().chatClientResponse();
+            reply = new BeanOutputConverter<>(AiStructuredReply.class)
+                    .convert(extractAssistantText(chatClientResponse.chatResponse()));
         } catch (RuntimeException e) {
             throw new BusinessException(500, "AI 结构化输出解析失败");
         }
 
         long assistantCreatedAt = System.currentTimeMillis();
-        AiStructuredReply reply = responseEntity.entity();
         if (reply == null || !StringUtils.hasText(reply.getContent())) {
             throw new BusinessException(500, "AI 返回的结构化内容为空");
         }
@@ -85,7 +93,8 @@ public class AiChatServiceImpl implements AiChatService {
         String finalToolStatus = normalizeToolStatus(reply.getToolStatus());
         String finalNextAction = resolveNextAction(runtime.promptPlan.nextAction(), finalAnswerType);
         AiDisplayCard finalCard = resolveCard(runtime.promptPlan.card(), finalAnswerType);
-        AiModelUsage usage = extractUsage(responseEntity);
+        AiModelUsage usage = extractUsage(chatClientResponse.chatResponse());
+        AiRetrievalMeta retrievalMeta = extractRetrievalMeta(chatClientResponse);
 
         conversationMemoryService.appendTurn(
                 currentUserId,
@@ -107,7 +116,8 @@ public class AiChatServiceImpl implements AiChatService {
                 finalToolStatus,
                 finalCard,
                 usage,
-                buildConversationMeta(runtime.promptContext, runtime.sceneResolution.reused())
+                buildConversationMeta(runtime.promptContext, runtime.sceneResolution.reused()),
+                retrievalMeta
         );
     }
 
@@ -344,12 +354,19 @@ public class AiChatServiceImpl implements AiChatService {
         };
     }
 
-    private AiModelUsage extractUsage(ResponseEntity<ChatResponse, AiStructuredReply> responseEntity) {
-        if (responseEntity == null || responseEntity.response() == null) {
+    private String extractAssistantText(ChatResponse chatResponse) {
+        if (chatResponse == null || chatResponse.getResult() == null || chatResponse.getResult().getOutput() == null) {
+            return null;
+        }
+        return chatResponse.getResult().getOutput().getText();
+    }
+
+    private AiModelUsage extractUsage(ChatResponse chatResponse) {
+        if (chatResponse == null) {
             return null;
         }
 
-        ChatResponseMetadata metadata = responseEntity.response().getMetadata();
+        ChatResponseMetadata metadata = chatResponse.getMetadata();
         if (metadata == null) {
             return null;
         }
@@ -362,6 +379,53 @@ public class AiChatServiceImpl implements AiChatService {
                 usage == null ? null : usage.getCompletionTokens(),
                 usage == null ? null : usage.getTotalTokens()
         );
+    }
+
+    private AiRetrievalMeta extractRetrievalMeta(ChatClientResponse chatClientResponse) {
+        if (chatClientResponse == null || chatClientResponse.context() == null) {
+            return null;
+        }
+
+        Object retrieved = chatClientResponse.context().get(QuestionAnswerAdvisor.RETRIEVED_DOCUMENTS);
+        if (!(retrieved instanceof List<?> retrievedDocuments)) {
+            return new AiRetrievalMeta(false, 0, List.of());
+        }
+
+        List<AiRetrievedDocument> documents = retrievedDocuments.stream()
+                .filter(Document.class::isInstance)
+                .map(Document.class::cast)
+                .map(this::mapRetrievedDocument)
+                .filter(Objects::nonNull)
+                .toList();
+
+        return new AiRetrievalMeta(!documents.isEmpty(), documents.size(), documents);
+    }
+
+    private AiRetrievedDocument mapRetrievedDocument(Document document) {
+        if (document == null) {
+            return null;
+        }
+
+        String title = valueAsString(document.getMetadata().getOrDefault("documentId", document.getId()));
+        String snippet = buildSnippet(document.getText());
+        return new AiRetrievedDocument(
+                document.getId(),
+                title,
+                document.getScore(),
+                snippet
+        );
+    }
+
+    private String valueAsString(Object value) {
+        return value == null ? null : String.valueOf(value);
+    }
+
+    private String buildSnippet(String text) {
+        if (!StringUtils.hasText(text)) {
+            return "";
+        }
+        String normalized = text.replace("\r", " ").replace("\n", " ").trim();
+        return normalized.length() <= 120 ? normalized : normalized.substring(0, 120) + "...";
     }
 
     private Map<AiSceneType, AiSceneHandler> buildSceneHandlerMap(List<AiSceneHandler> sceneHandlers) {

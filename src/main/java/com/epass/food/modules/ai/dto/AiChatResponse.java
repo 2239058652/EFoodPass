@@ -26,4 +26,6 @@ public class AiChatResponse {
     private AiModelUsage usage;
 
     private AiConversationMeta conversation;
+
+    private AiRetrievalMeta retrieval;
 }
