@@ -43,14 +43,14 @@ public class AiConversationMemoryService {
     }
 
     public List<ConversationTurn> getRecentTurns(Long userId, String sessionId, int limit) {
-        String turnsKey = buildTurnsKey(userId, sessionId);
-        Long size = stringRedisTemplate.opsForList().size(turnsKey);
+        String promptTurnsKey = buildPromptTurnsKey(userId, sessionId);
+        Long size = stringRedisTemplate.opsForList().size(promptTurnsKey);
         if (size == null || size == 0) {
             return List.of();
         }
 
         long start = Math.max(0, size - limit);
-        List<String> values = stringRedisTemplate.opsForList().range(turnsKey, start, -1);
+        List<String> values = stringRedisTemplate.opsForList().range(promptTurnsKey, start, -1);
         if (values == null || values.isEmpty()) {
             return List.of();
         }
@@ -108,7 +108,7 @@ public class AiConversationMemoryService {
         }
 
         String summary = stringRedisTemplate.opsForValue().get(buildSummaryKey(userId, sessionId));
-        List<ConversationTurn> turns = getAllTurns(userId, sessionId);
+        List<ConversationTurn> turns = getAllArchiveTurns(userId, sessionId);
         List<AiConversationMessage> messages = new ArrayList<>();
         for (ConversationTurn turn : turns) {
             messages.add(new AiConversationMessage("user", turn.userMessage(), turn.userCreatedAt()));
@@ -133,7 +133,8 @@ public class AiConversationMemoryService {
                            String assistantMessage,
                            long userCreatedAt,
                            long assistantCreatedAt) {
-        String turnsKey = buildTurnsKey(userId, sessionId);
+        String promptTurnsKey = buildPromptTurnsKey(userId, sessionId);
+        String archiveTurnsKey = buildArchiveTurnsKey(userId, sessionId);
         String sceneKey = buildSceneKey(userId, sessionId);
         String summaryKey = buildSummaryKey(userId, sessionId);
         String sessionIndexKey = buildSessionIndexKey(userId);
@@ -146,13 +147,18 @@ public class AiConversationMemoryService {
                 userCreatedAt,
                 assistantCreatedAt
         );
-        stringRedisTemplate.opsForList()
-                .rightPush(turnsKey, serializeTurn(turn));
-        stringRedisTemplate.opsForList().trim(turnsKey, -properties.getMaxTurns(), -1);
-        stringRedisTemplate.expire(turnsKey, ttl);
+        String serializedTurn = serializeTurn(turn);
+
+        stringRedisTemplate.opsForList().rightPush(promptTurnsKey, serializedTurn);
+        stringRedisTemplate.opsForList().trim(promptTurnsKey, -properties.getMaxTurns(), -1);
+        stringRedisTemplate.expire(promptTurnsKey, ttl);
+
+        stringRedisTemplate.opsForList().rightPush(archiveTurnsKey, serializedTurn);
+        stringRedisTemplate.opsForList().trim(archiveTurnsKey, -properties.getArchiveMaxTurns(), -1);
+        stringRedisTemplate.expire(archiveTurnsKey, ttl);
 
         stringRedisTemplate.opsForValue().set(sceneKey, sceneType.name(), ttl);
-        refreshSummary(turnsKey, summaryKey, ttl);
+        refreshSummary(archiveTurnsKey, summaryKey, ttl);
 
         AiConversationSessionSummary existingSummary = readSessionMeta(userId, sessionId);
         String title = existingSummary != null
@@ -205,7 +211,8 @@ public class AiConversationMemoryService {
         }
 
         stringRedisTemplate.delete(List.of(
-                buildTurnsKey(userId, sessionId),
+                buildPromptTurnsKey(userId, sessionId),
+                buildArchiveTurnsKey(userId, sessionId),
                 buildSceneKey(userId, sessionId),
                 buildSummaryKey(userId, sessionId),
                 buildSessionMetaKey(userId, sessionId)
@@ -213,8 +220,8 @@ public class AiConversationMemoryService {
         stringRedisTemplate.opsForZSet().remove(buildSessionIndexKey(userId), sessionId);
     }
 
-    private List<ConversationTurn> getAllTurns(Long userId, String sessionId) {
-        List<String> values = stringRedisTemplate.opsForList().range(buildTurnsKey(userId, sessionId), 0, -1);
+    private List<ConversationTurn> getAllArchiveTurns(Long userId, String sessionId) {
+        List<String> values = stringRedisTemplate.opsForList().range(buildArchiveTurnsKey(userId, sessionId), 0, -1);
         if (values == null || values.isEmpty()) {
             return List.of();
         }
@@ -224,8 +231,12 @@ public class AiConversationMemoryService {
                 .toList();
     }
 
-    private String buildTurnsKey(Long userId, String sessionId) {
-        return "ai:conversation:" + userId + ":" + sessionId + ":turns";
+    private String buildPromptTurnsKey(Long userId, String sessionId) {
+        return "ai:conversation:" + userId + ":" + sessionId + ":prompt-turns";
+    }
+
+    private String buildArchiveTurnsKey(Long userId, String sessionId) {
+        return "ai:conversation:" + userId + ":" + sessionId + ":archive-turns";
     }
 
     private String buildSceneKey(Long userId, String sessionId) {
@@ -244,8 +255,8 @@ public class AiConversationMemoryService {
         return "ai:conversation:" + userId + ":sessions";
     }
 
-    private void refreshSummary(String turnsKey, String summaryKey, Duration ttl) {
-        List<String> values = stringRedisTemplate.opsForList().range(turnsKey, 0, -1);
+    private void refreshSummary(String archiveTurnsKey, String summaryKey, Duration ttl) {
+        List<String> values = stringRedisTemplate.opsForList().range(archiveTurnsKey, 0, -1);
         if (values == null || values.isEmpty()) {
             stringRedisTemplate.delete(summaryKey);
             return;

@@ -9,6 +9,8 @@ public class AiConversationMemoryProperties {
 
     private int maxTurns = 6;
 
+    private int archiveMaxTurns = 100;
+
     private int recentTurnsForPrompt = 3;
 
     private int summaryMaxChars = 240;
@@ -29,6 +31,14 @@ public class AiConversationMemoryProperties {
 
     public void setRecentTurnsForPrompt(int recentTurnsForPrompt) {
         this.recentTurnsForPrompt = recentTurnsForPrompt;
+    }
+
+    public int getArchiveMaxTurns() {
+        return archiveMaxTurns;
+    }
+
+    public void setArchiveMaxTurns(int archiveMaxTurns) {
+        this.archiveMaxTurns = archiveMaxTurns;
     }
 
     public int getSummaryMaxChars() {
