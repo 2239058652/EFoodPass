@@ -113,15 +113,9 @@ public class AiConversationMemoryService {
         int resolvedPageSize = Math.max(1, Math.min(pageSize, MAX_DETAIL_PAGE_SIZE));
         String summary = stringRedisTemplate.opsForValue().get(buildSummaryKey(userId, sessionId));
 
-        PagedTurns pagedTurns = getArchiveTurnsPage(userId, sessionId, resolvedPageNum, resolvedPageSize);
-        List<AiConversationMessage> messages = new ArrayList<>();
-        for (ConversationTurn turn : pagedTurns.turns()) {
-            messages.add(new AiConversationMessage("user", turn.userMessage(), turn.userCreatedAt()));
-            messages.add(new AiConversationMessage("assistant", turn.assistantMessage(), turn.assistantCreatedAt()));
-        }
-
-        long totalMessages = pagedTurns.totalTurns() * 2;
-        boolean hasMore = (long) resolvedPageNum * resolvedPageSize < totalMessages;
+        List<AiConversationMessage> allMessages = buildArchiveMessages(userId, sessionId);
+        long totalMessages = allMessages.size();
+        MessagePage messagePage = pageMessagesFromLatest(allMessages, resolvedPageNum, resolvedPageSize);
 
         return new AiConversationSessionDetail(
                 sessionSummary.getSessionId(),
@@ -133,8 +127,8 @@ public class AiConversationMemoryService {
                 totalMessages,
                 resolvedPageNum,
                 resolvedPageSize,
-                hasMore,
-                messages
+                messagePage.hasMore(),
+                messagePage.messages()
         );
     }
 
@@ -232,28 +226,36 @@ public class AiConversationMemoryService {
         stringRedisTemplate.opsForZSet().remove(buildSessionIndexKey(userId), sessionId);
     }
 
-    private PagedTurns getArchiveTurnsPage(Long userId, String sessionId, int pageNum, int pageSize) {
-        String archiveTurnsKey = buildArchiveTurnsKey(userId, sessionId);
-        Long totalTurns = stringRedisTemplate.opsForList().size(archiveTurnsKey);
-        if (totalTurns == null || totalTurns == 0) {
-            return new PagedTurns(0, List.of());
-        }
-
-        long start = (long) (pageNum - 1) * pageSize;
-        if (start >= totalTurns) {
-            return new PagedTurns(totalTurns, List.of());
-        }
-
-        long end = Math.min(totalTurns - 1, start + pageSize - 1);
-        List<String> values = stringRedisTemplate.opsForList().range(archiveTurnsKey, start, end);
+    private List<AiConversationMessage> buildArchiveMessages(Long userId, String sessionId) {
+        List<String> values = stringRedisTemplate.opsForList().range(buildArchiveTurnsKey(userId, sessionId), 0, -1);
         if (values == null || values.isEmpty()) {
-            return new PagedTurns(totalTurns, List.of());
+            return List.of();
         }
 
-        List<ConversationTurn> turns = values.stream()
-                .map(this::deserializeTurn)
-                .toList();
-        return new PagedTurns(totalTurns, turns);
+        List<AiConversationMessage> messages = new ArrayList<>();
+        for (String value : values) {
+            ConversationTurn turn = deserializeTurn(value);
+            messages.add(new AiConversationMessage("user", turn.userMessage(), turn.userCreatedAt()));
+            messages.add(new AiConversationMessage("assistant", turn.assistantMessage(), turn.assistantCreatedAt()));
+        }
+        return messages;
+    }
+
+    private MessagePage pageMessagesFromLatest(List<AiConversationMessage> allMessages, int pageNum, int pageSize) {
+        int totalMessages = allMessages.size();
+        if (totalMessages == 0) {
+            return new MessagePage(List.of(), false);
+        }
+
+        int endExclusive = Math.max(0, totalMessages - (pageNum - 1) * pageSize);
+        int startInclusive = Math.max(0, endExclusive - pageSize);
+        if (startInclusive >= endExclusive) {
+            return new MessagePage(List.of(), false);
+        }
+
+        List<AiConversationMessage> pageMessages = new ArrayList<>(allMessages.subList(startInclusive, endExclusive));
+        boolean hasMore = startInclusive > 0;
+        return new MessagePage(pageMessages, hasMore);
     }
 
     private String buildPromptTurnsKey(Long userId, String sessionId) {
@@ -413,6 +415,6 @@ public class AiConversationMemoryService {
                                    Long assistantCreatedAt) {
     }
 
-    private record PagedTurns(long totalTurns, List<ConversationTurn> turns) {
+    private record MessagePage(List<AiConversationMessage> messages, boolean hasMore) {
     }
 }
