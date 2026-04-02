@@ -13,6 +13,7 @@ import org.springframework.stereotype.Service;
 
 import java.util.Arrays;
 import java.util.List;
+import java.util.Map;
 
 @Service
 public class ItemAiSceneService implements AiSceneHandler {
@@ -51,14 +52,20 @@ public class ItemAiSceneService implements AiSceneHandler {
                     AiAnswerType.NORMAL,
                     true,
                     "view_item_status",
-                    buildStatusCard()
+                    buildStatusCard(),
+                    new Object[0],
+                    Map.of(),
+                    structuredParams("content").toMap()
             );
             case GENERAL_ITEM -> new AiPromptPlan(
                     buildGeneralPrompt(),
                     AiAnswerType.NORMAL,
                     true,
                     "view_item_module",
-                    new AiDisplayCard("菜品助手", "item", "当前回答围绕菜品领域的一般问题生成。", List.of())
+                    new AiDisplayCard("菜品助手", "item", "当前回答围绕菜品领域的一般问题生成。", List.of()),
+                    new Object[0],
+                    Map.of(),
+                    structuredParams("content").toMap()
             );
         };
     }
@@ -71,7 +78,10 @@ public class ItemAiSceneService implements AiSceneHandler {
                     AiAnswerType.NORMAL,
                     true,
                     "ask_more_details",
-                    new AiDisplayCard("菜品查询", "item-detail", "未能从问题中提取菜品编号。", List.of())
+                    new AiDisplayCard("菜品查询", "item-detail", "未能从问题中提取菜品编号。", List.of()),
+                    new Object[0],
+                    Map.of(),
+                    structuredParams("content").toMap()
             );
         }
 
@@ -93,13 +103,6 @@ public class ItemAiSceneService implements AiSceneHandler {
                 2. status = not_found：明确说明菜品不存在
 
                 不要编造任何菜品详情。
-                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                JSON 格式如下：
-                {
-                  "content": "给用户的中文回答",
-                  "toolStatus": "success"
-                }
-                其中 toolStatus 只能取 success、not_found 两个值之一。
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
                 itemFactProvider.buildItemFacts(),
@@ -113,7 +116,10 @@ public class ItemAiSceneService implements AiSceneHandler {
                 resolveDetailAction(reference),
                 buildDetailToolCard(reference),
                 new Object[]{itemAiTools},
-                java.util.Map.of()
+                Map.of(),
+                structuredParams("content", "toolStatus")
+                        .withToolStatus("success", "not_found")
+                        .toMap()
         );
     }
 
@@ -126,12 +132,6 @@ public class ItemAiSceneService implements AiSceneHandler {
 
                 当前问题更偏向菜品状态规则说明。
                 这类问题优先基于静态业务事实回答，不需要调用工具。
-
-                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                JSON 格式如下：
-                {
-                  "content": "给用户的中文回答"
-                }
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
                 itemFactProvider.buildItemFacts()
@@ -147,12 +147,6 @@ public class ItemAiSceneService implements AiSceneHandler {
 
                 当前问题属于一般菜品问题。
                 请严格基于这些真实事实回答，不要编造。
-
-                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                JSON 格式如下：
-                {
-                  "content": "给用户的中文回答"
-                }
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
                 itemFactProvider.buildItemFacts()
@@ -199,5 +193,34 @@ public class ItemAiSceneService implements AiSceneHandler {
                         new AiDisplayField("数据来源", "getItemDetail 工具")
                 )
         );
+    }
+
+    private StructuredOutputParams structuredParams(String... fields) {
+        return new StructuredOutputParams(fields);
+    }
+
+    private static final class StructuredOutputParams {
+
+        private final List<String> fields;
+        private List<String> toolStatusOptions = List.of();
+
+        private StructuredOutputParams(String... fields) {
+            this.fields = List.of(fields);
+        }
+
+        private StructuredOutputParams withToolStatus(String... options) {
+            this.toolStatusOptions = List.of(options);
+            return this;
+        }
+
+        private Map<String, Object> toMap() {
+            if (toolStatusOptions.isEmpty()) {
+                return Map.of(AiAdvisorContextKeys.STRUCTURED_FIELDS, fields);
+            }
+            return Map.of(
+                    AiAdvisorContextKeys.STRUCTURED_FIELDS, fields,
+                    AiAdvisorContextKeys.TOOL_STATUS_OPTIONS, toolStatusOptions
+            );
+        }
     }
 }

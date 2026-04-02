@@ -52,7 +52,10 @@ public class OrderAiSceneService implements AiSceneHandler {
                     AiAnswerType.NORMAL,
                     true,
                     "view_order_status",
-                    buildStatusCard()
+                    buildStatusCard(),
+                    new Object[0],
+                    Map.of(),
+                    structuredParams("content").toMap()
             );
             case REALTIME_STATS -> new AiPromptPlan(
                     buildRealtimeToolPrompt(),
@@ -61,14 +64,20 @@ public class OrderAiSceneService implements AiSceneHandler {
                     "view_order_module",
                     buildRealtimeToolCard(),
                     new Object[]{orderAiTools},
-                    buildToolContext(context)
+                    buildToolContext(context),
+                    structuredParams("content", "toolStatus")
+                            .withToolStatus("success")
+                            .toMap()
             );
             case GENERAL_ORDER -> new AiPromptPlan(
                     buildGeneralPrompt(),
                     AiAnswerType.NORMAL,
                     true,
                     "view_order_module",
-                    new AiDisplayCard("订单助手", "order", "当前回答围绕订单领域的一般问题生成。", List.of())
+                    new AiDisplayCard("订单助手", "order", "当前回答围绕订单领域的一般问题生成。", List.of()),
+                    new Object[0],
+                    Map.of(),
+                    structuredParams("content").toMap()
             );
         };
     }
@@ -81,7 +90,10 @@ public class OrderAiSceneService implements AiSceneHandler {
                     AiAnswerType.NORMAL,
                     true,
                     "ask_more_details",
-                    new AiDisplayCard("订单查询", "order-detail", "未能从问题中提取订单编号。", List.of())
+                    new AiDisplayCard("订单查询", "order-detail", "未能从问题中提取订单编号。", List.of()),
+                    new Object[0],
+                    Map.of(),
+                    structuredParams("content").toMap()
             );
         }
 
@@ -104,13 +116,6 @@ public class OrderAiSceneService implements AiSceneHandler {
                 3. status = restricted：明确说明当前登录用户无权查看该订单
 
                 不要编造任何订单详情。
-                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                JSON 格式如下：
-                {
-                  "content": "给用户的中文回答",
-                  "toolStatus": "success"
-                }
-                其中 toolStatus 只能取 success、not_found、restricted 三个值之一。
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
                 orderFactProvider.buildOrderFacts(),
@@ -124,7 +129,10 @@ public class OrderAiSceneService implements AiSceneHandler {
                 resolveDetailAction(reference),
                 buildDetailToolCard(reference),
                 new Object[]{orderAiTools},
-                buildToolContext(context)
+                buildToolContext(context),
+                structuredParams("content", "toolStatus")
+                        .withToolStatus("success", "not_found", "restricted")
+                        .toMap()
         );
     }
 
@@ -138,12 +146,6 @@ public class OrderAiSceneService implements AiSceneHandler {
                 你现在是 EFoodPass 的订单助手。
                 当前问题属于一般订单问题。
                 请严格基于这些真实事实回答，不要编造。
-
-                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                JSON 格式如下：
-                {
-                  "content": "给用户的中文回答"
-                }
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
                 orderFactProvider.buildOrderFacts()
@@ -160,12 +162,6 @@ public class OrderAiSceneService implements AiSceneHandler {
                 你现在是 EFoodPass 的订单助手。
                 当前问题更偏向订单规则、订单状态定义或订单流程说明。
                 这类问题优先基于静态业务事实回答，不需要调用工具。
-
-                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                JSON 格式如下：
-                {
-                  "content": "给用户的中文回答"
-                }
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
                 orderFactProvider.buildOrderFacts()
@@ -186,14 +182,6 @@ public class OrderAiSceneService implements AiSceneHandler {
 
                 如果工具返回 success，就基于工具结果回答。
                 不要编造任何统计数字。
-
-                你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
-                JSON 格式如下：
-                {
-                  "content": "给用户的中文回答",
-                  "toolStatus": "success"
-                }
-                其中 toolStatus 在这个工具里固定返回 success。
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
                 orderFactProvider.buildOrderFacts()
@@ -259,5 +247,34 @@ public class OrderAiSceneService implements AiSceneHandler {
                         new AiDisplayField("数据来源", "getAccessibleOrderDetail 工具")
                 )
         );
+    }
+
+    private StructuredOutputParams structuredParams(String... fields) {
+        return new StructuredOutputParams(fields);
+    }
+
+    private static final class StructuredOutputParams {
+
+        private final List<String> fields;
+        private List<String> toolStatusOptions = List.of();
+
+        private StructuredOutputParams(String... fields) {
+            this.fields = List.of(fields);
+        }
+
+        private StructuredOutputParams withToolStatus(String... options) {
+            this.toolStatusOptions = List.of(options);
+            return this;
+        }
+
+        private Map<String, Object> toMap() {
+            if (toolStatusOptions.isEmpty()) {
+                return Map.of(AiAdvisorContextKeys.STRUCTURED_FIELDS, fields);
+            }
+            return Map.of(
+                    AiAdvisorContextKeys.STRUCTURED_FIELDS, fields,
+                    AiAdvisorContextKeys.TOOL_STATUS_OPTIONS, toolStatusOptions
+            );
+        }
     }
 }

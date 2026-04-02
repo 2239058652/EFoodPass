@@ -15,6 +15,7 @@ import com.epass.food.modules.ai.service.AiChatService;
 import com.epass.food.modules.ai.service.AiConversationMemoryService;
 import com.epass.food.modules.ai.service.AiSceneClassifier;
 import com.epass.food.modules.ai.service.AiSceneHandler;
+import com.epass.food.modules.ai.service.AiStructuredOutputAdvisor;
 import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ResponseEntity;
 import org.springframework.stereotype.Service;
@@ -31,15 +32,18 @@ public class AiChatServiceImpl implements AiChatService {
     private final AiSceneClassifier aiSceneClassifier;
     private final AiConversationMemoryService conversationMemoryService;
     private final Map<AiSceneType, AiSceneHandler> sceneHandlerMap;
+    private final AiStructuredOutputAdvisor structuredOutputAdvisor;
 
     public AiChatServiceImpl(ChatClient.Builder chatClientBuilder,
                              AiSceneClassifier aiSceneClassifier,
                              AiConversationMemoryService conversationMemoryService,
-                             List<AiSceneHandler> sceneHandlers) {
+                             List<AiSceneHandler> sceneHandlers,
+                             AiStructuredOutputAdvisor structuredOutputAdvisor) {
         this.chatClient = chatClientBuilder.build();
         this.aiSceneClassifier = aiSceneClassifier;
         this.conversationMemoryService = conversationMemoryService;
         this.sceneHandlerMap = buildSceneHandlerMap(sceneHandlers);
+        this.structuredOutputAdvisor = structuredOutputAdvisor;
     }
 
     @Override
@@ -62,7 +66,8 @@ public class AiChatServiceImpl implements AiChatService {
 
         var requestSpec = chatClient.prompt()
                 .system(promptWithHistory)
-                .user(message);
+                .user(message)
+                .advisors(spec -> spec.advisors(structuredOutputAdvisor).params(promptPlan.advisorParams()));
 
         if (promptPlan.hasTools()) {
             requestSpec = requestSpec.tools(promptPlan.tools());
