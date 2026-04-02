@@ -2,6 +2,7 @@ package com.epass.food.modules.ai.service.impl;
 
 import com.epass.food.common.exception.BusinessException;
 import com.epass.food.modules.ai.dto.AiChatResponse;
+import com.epass.food.modules.ai.dto.AiConversationMeta;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
@@ -44,15 +45,18 @@ public class AiChatServiceImpl implements AiChatService {
     @Override
     public AiChatResponse chat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder) {
         String resolvedSessionId = conversationMemoryService.ensureSessionId(sessionId);
-        AiSceneType sceneType = resolveSceneType(message, currentUserId, resolvedSessionId);
+        SceneResolution sceneResolution = resolveSceneType(message, currentUserId, resolvedSessionId);
+        AiConversationMemoryService.ConversationPromptContext promptContext =
+                conversationMemoryService.getPromptContext(currentUserId, resolvedSessionId);
+
         AiSceneRequestContext context = new AiSceneRequestContext(
                 message,
                 resolvedSessionId,
                 currentUserId,
                 canViewAnyOrder
         );
-        AiPromptPlan promptPlan = buildPromptByScene(sceneType, context);
-        String promptWithHistory = appendConversationHistory(promptPlan.prompt(), currentUserId, resolvedSessionId);
+        AiPromptPlan promptPlan = buildPromptByScene(sceneResolution.sceneType(), context);
+        String promptWithHistory = appendConversationHistory(promptPlan.prompt(), promptContext);
 
         String rawContent = chatClient.prompt()
                 .system(promptWithHistory)
@@ -61,15 +65,23 @@ public class AiChatServiceImpl implements AiChatService {
                 .content();
 
         AiStructuredReply reply = parseStructuredReply(rawContent);
-        conversationMemoryService.appendTurn(currentUserId, resolvedSessionId, sceneType, message, reply.getContent());
+        conversationMemoryService.appendTurn(
+                currentUserId,
+                resolvedSessionId,
+                sceneResolution.sceneType(),
+                message,
+                reply.getContent()
+        );
+
         return new AiChatResponse(
                 resolvedSessionId,
                 reply.getContent(),
-                sceneType.name().toLowerCase(),
+                sceneResolution.sceneType().name().toLowerCase(),
                 promptPlan.grounded(),
                 promptPlan.nextAction(),
                 promptPlan.answerType().name().toLowerCase(),
-                promptPlan.card()
+                promptPlan.card(),
+                buildConversationMeta(promptContext, sceneResolution.reused())
         );
     }
 
@@ -89,17 +101,19 @@ public class AiChatServiceImpl implements AiChatService {
         return sceneHandler.buildPlan(context);
     }
 
-    private AiSceneType resolveSceneType(String message, Long currentUserId, String sessionId) {
-        AiSceneType sceneType = aiSceneClassifier.classify(message);
-        if (sceneType != AiSceneType.GENERAL) {
-            return sceneType;
+    private SceneResolution resolveSceneType(String message, Long currentUserId, String sessionId) {
+        AiSceneType classifiedScene = aiSceneClassifier.classify(message);
+        if (classifiedScene != AiSceneType.GENERAL) {
+            return new SceneResolution(classifiedScene, false);
         }
 
         if (!shouldReuseLastScene(message)) {
-            return sceneType;
+            return new SceneResolution(classifiedScene, false);
         }
 
-        return conversationMemoryService.getLastScene(currentUserId, sessionId).orElse(AiSceneType.GENERAL);
+        return conversationMemoryService.getLastScene(currentUserId, sessionId)
+                .map(sceneType -> new SceneResolution(sceneType, true))
+                .orElse(new SceneResolution(AiSceneType.GENERAL, false));
     }
 
     private boolean shouldReuseLastScene(String message) {
@@ -117,10 +131,8 @@ public class AiChatServiceImpl implements AiChatService {
                 || trimmed.contains("还有");
     }
 
-    private String appendConversationHistory(String basePrompt, Long currentUserId, String sessionId) {
-        AiConversationMemoryService.ConversationPromptContext promptContext =
-                conversationMemoryService.getPromptContext(currentUserId, sessionId);
-
+    private String appendConversationHistory(String basePrompt,
+                                             AiConversationMemoryService.ConversationPromptContext promptContext) {
         boolean hasSummary = StringUtils.hasText(promptContext.summary());
         boolean hasRecentTurns = !promptContext.recentTurns().isEmpty();
         if (!hasSummary && !hasRecentTurns) {
@@ -154,6 +166,18 @@ public class AiChatServiceImpl implements AiChatService {
         return basePrompt + historyBuilder;
     }
 
+    private AiConversationMeta buildConversationMeta(
+            AiConversationMemoryService.ConversationPromptContext promptContext,
+            boolean sceneReused
+    ) {
+        return new AiConversationMeta(
+                StringUtils.hasText(promptContext.summary()) || !promptContext.recentTurns().isEmpty(),
+                StringUtils.hasText(promptContext.summary()),
+                promptContext.recentTurns().size(),
+                sceneReused
+        );
+    }
+
     private AiStructuredReply parseStructuredReply(String rawContent) {
         try {
             return objectMapper.readValue(rawContent, AiStructuredReply.class);
@@ -168,5 +192,8 @@ public class AiChatServiceImpl implements AiChatService {
             handlerMap.put(sceneHandler.sceneType(), sceneHandler);
         }
         return handlerMap;
+    }
+
+    private record SceneResolution(AiSceneType sceneType, boolean reused) {
     }
 }

@@ -20,4 +20,6 @@ public class AiChatResponse {
     private String answerType;
 
     private AiDisplayCard card;
+
+    private AiConversationMeta conversation;
 }
