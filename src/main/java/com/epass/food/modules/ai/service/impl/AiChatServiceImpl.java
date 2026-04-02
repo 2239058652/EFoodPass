@@ -1,10 +1,12 @@
 package com.epass.food.modules.ai.service.impl;
 
 import com.epass.food.common.exception.BusinessException;
+import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiChatResponse;
 import com.epass.food.modules.ai.dto.AiConversationMeta;
 import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
+import com.epass.food.modules.ai.dto.AiDisplayCard;
 import com.epass.food.modules.ai.dto.AiPromptPlan;
 import com.epass.food.modules.ai.dto.AiSceneRequestContext;
 import com.epass.food.modules.ai.dto.AiSceneType;
@@ -77,6 +79,11 @@ public class AiChatServiceImpl implements AiChatService {
 
         long assistantCreatedAt = System.currentTimeMillis();
         AiStructuredReply reply = parseStructuredReply(rawContent);
+        AiAnswerType finalAnswerType = resolveAnswerType(promptPlan.answerType(), reply.getToolStatus());
+        String finalToolStatus = normalizeToolStatus(reply.getToolStatus());
+        String finalNextAction = resolveNextAction(promptPlan.nextAction(), finalAnswerType);
+        AiDisplayCard finalCard = resolveCard(promptPlan.card(), finalAnswerType);
+
         conversationMemoryService.appendTurn(
                 currentUserId,
                 resolvedSessionId,
@@ -92,9 +99,10 @@ public class AiChatServiceImpl implements AiChatService {
                 reply.getContent(),
                 sceneResolution.sceneType().name().toLowerCase(),
                 promptPlan.grounded(),
-                promptPlan.nextAction(),
-                promptPlan.answerType().name().toLowerCase(),
-                promptPlan.card(),
+                finalNextAction,
+                finalAnswerType.name().toLowerCase(),
+                finalToolStatus,
+                finalCard,
                 buildConversationMeta(promptContext, sceneResolution.reused())
         );
     }
@@ -205,6 +213,51 @@ public class AiChatServiceImpl implements AiChatService {
                 promptContext.recentTurns().size(),
                 sceneReused
         );
+    }
+
+    private AiAnswerType resolveAnswerType(AiAnswerType defaultAnswerType, String toolStatus) {
+        if (!StringUtils.hasText(toolStatus)) {
+            return defaultAnswerType;
+        }
+
+        return switch (toolStatus.trim().toLowerCase()) {
+            case "success" -> AiAnswerType.NORMAL;
+            case "not_found" -> AiAnswerType.NOT_FOUND;
+            case "restricted" -> AiAnswerType.RESTRICTED;
+            default -> defaultAnswerType;
+        };
+    }
+
+    private String normalizeToolStatus(String toolStatus) {
+        if (!StringUtils.hasText(toolStatus)) {
+            return "none";
+        }
+        return toolStatus.trim().toLowerCase();
+    }
+
+    private String resolveNextAction(String defaultNextAction, AiAnswerType answerType) {
+        if (answerType == AiAnswerType.NORMAL) {
+            return defaultNextAction;
+        }
+        return "ask_more_details";
+    }
+
+    private AiDisplayCard resolveCard(AiDisplayCard defaultCard, AiAnswerType answerType) {
+        return switch (answerType) {
+            case NORMAL -> defaultCard;
+            case NOT_FOUND -> new AiDisplayCard(
+                    "未找到目标数据",
+                    "not-found",
+                    "当前查询目标不存在，请确认输入的信息是否正确。",
+                    List.of()
+            );
+            case RESTRICTED -> new AiDisplayCard(
+                    "访问受限",
+                    "restricted",
+                    "当前登录用户无权访问该数据，或系统不允许返回详情。",
+                    List.of()
+            );
+        };
     }
 
     private AiStructuredReply parseStructuredReply(String rawContent) {

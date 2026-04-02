@@ -68,12 +68,7 @@ public class OrderAiSceneService implements AiSceneHandler {
                     AiAnswerType.NORMAL,
                     true,
                     "view_order_module",
-                    new AiDisplayCard(
-                            "订单助手",
-                            "order",
-                            "当前回答围绕订单领域的一般问题生成。",
-                            List.of()
-                    )
+                    new AiDisplayCard("订单助手", "order", "当前回答围绕订单领域的一般问题生成。", List.of())
             );
         };
     }
@@ -86,12 +81,7 @@ public class OrderAiSceneService implements AiSceneHandler {
                     AiAnswerType.NORMAL,
                     true,
                     "ask_more_details",
-                    new AiDisplayCard(
-                            "订单查询",
-                            "order-detail",
-                            "未能从问题中提取订单编号。",
-                            List.of()
-                    )
+                    new AiDisplayCard("订单查询", "order-detail", "未能从问题中提取订单编号。", List.of())
             );
         }
 
@@ -117,8 +107,10 @@ public class OrderAiSceneService implements AiSceneHandler {
                 你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
                 JSON 格式如下：
                 {
-                  "content": "给用户的中文回答"
+                  "content": "给用户的中文回答",
+                  "toolStatus": "success"
                 }
+                其中 toolStatus 只能取 success、not_found、restricted 三个值之一。
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
                 orderFactProvider.buildOrderFacts(),
@@ -198,8 +190,10 @@ public class OrderAiSceneService implements AiSceneHandler {
                 你必须只返回一个 JSON 对象，不要返回 Markdown，不要返回代码块，不要添加额外说明。
                 JSON 格式如下：
                 {
-                  "content": "给用户的中文回答"
+                  "content": "给用户的中文回答",
+                  "toolStatus": "success"
                 }
+                其中 toolStatus 在这个工具里固定返回 success。
                 """.formatted(
                 businessContextProvider.buildCommonFacts(),
                 orderFactProvider.buildOrderFacts()

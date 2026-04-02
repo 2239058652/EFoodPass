@@ -19,6 +19,8 @@ public class AiChatResponse {
 
     private String answerType;
 
+    private String toolStatus;
+
     private AiDisplayCard card;
 
     private AiConversationMeta conversation;
