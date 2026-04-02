@@ -4,12 +4,14 @@ import com.epass.food.common.result.Result;
 import com.epass.food.config.security.LoginUser;
 import com.epass.food.modules.ai.dto.AiChatRequest;
 import com.epass.food.modules.ai.dto.AiChatResponse;
+import com.epass.food.modules.ai.dto.AiChatStreamChunk;
 import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionRenameRequest;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
 import com.epass.food.modules.ai.service.AiChatService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
+import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -19,6 +21,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
@@ -46,6 +49,21 @@ public class AiChatController {
                         loginUser.getUserId(),
                         canViewAnyOrder
                 )
+        );
+    }
+
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public Flux<AiChatStreamChunk> streamChat(@Valid @RequestBody AiChatRequest request,
+                                              Authentication authentication) {
+        LoginUser loginUser = (LoginUser) authentication.getPrincipal();
+        boolean canViewAnyOrder = authentication.getAuthorities().stream()
+                .anyMatch(authority -> "food:order:detail".equals(authority.getAuthority()));
+
+        return aiChatService.streamChat(
+                request.getMessage(),
+                request.getSessionId(),
+                loginUser.getUserId(),
+                canViewAnyOrder
         );
     }
 

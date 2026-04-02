@@ -1,14 +1,18 @@
 package com.epass.food.modules.ai.service;
 
 import com.epass.food.modules.ai.dto.AiChatResponse;
+import com.epass.food.modules.ai.dto.AiChatStreamChunk;
 import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
+import reactor.core.publisher.Flux;
 
 import java.util.List;
 
 public interface AiChatService {
 
     AiChatResponse chat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder);
+
+    Flux<AiChatStreamChunk> streamChat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder);
 
     void clearSession(String sessionId, Long currentUserId);
 

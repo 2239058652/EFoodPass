@@ -3,6 +3,7 @@ package com.epass.food.modules.ai.service.impl;
 import com.epass.food.common.exception.BusinessException;
 import com.epass.food.modules.ai.dto.AiAnswerType;
 import com.epass.food.modules.ai.dto.AiChatResponse;
+import com.epass.food.modules.ai.dto.AiChatStreamChunk;
 import com.epass.food.modules.ai.dto.AiConversationMeta;
 import com.epass.food.modules.ai.dto.AiConversationSessionDetail;
 import com.epass.food.modules.ai.dto.AiConversationSessionSummary;
@@ -22,6 +23,7 @@ import org.springframework.ai.chat.client.ChatClient;
 import org.springframework.ai.chat.client.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
+import reactor.core.publisher.Flux;
 
 import java.util.EnumMap;
 import java.util.HashMap;
@@ -57,31 +59,8 @@ public class AiChatServiceImpl implements AiChatService {
         String resolvedSessionId = conversationMemoryService.ensureSessionId(sessionId);
         long userCreatedAt = System.currentTimeMillis();
 
-        SceneResolution sceneResolution = resolveSceneType(message, currentUserId, resolvedSessionId);
-        AiConversationMemoryService.ConversationPromptContext promptContext =
-                conversationMemoryService.getPromptContext(currentUserId, resolvedSessionId);
-
-        AiSceneRequestContext context = new AiSceneRequestContext(
-                message,
-                resolvedSessionId,
-                currentUserId,
-                canViewAnyOrder
-        );
-        AiPromptPlan promptPlan = buildPromptByScene(sceneResolution.sceneType(), context);
-
-        var requestSpec = chatClient.prompt()
-                .system(promptPlan.prompt())
-                .user(message)
-                .advisors(spec -> spec
-                        .advisors(conversationMemoryAdvisor, structuredOutputAdvisor)
-                        .params(buildAdvisorParams(promptPlan, promptContext)));
-
-        if (promptPlan.hasTools()) {
-            requestSpec = requestSpec.tools(promptPlan.tools());
-            if (!promptPlan.toolContext().isEmpty()) {
-                requestSpec = requestSpec.toolContext(promptPlan.toolContext());
-            }
-        }
+        SceneRuntime runtime = prepareRuntime(message, resolvedSessionId, currentUserId, canViewAnyOrder);
+        var requestSpec = buildStructuredRequest(runtime);
 
         ResponseEntity<?, AiStructuredReply> responseEntity;
         try {
@@ -96,15 +75,15 @@ public class AiChatServiceImpl implements AiChatService {
             throw new BusinessException(500, "AI 返回的结构化内容为空");
         }
 
-        AiAnswerType finalAnswerType = resolveAnswerType(promptPlan.answerType(), reply.getToolStatus());
+        AiAnswerType finalAnswerType = resolveAnswerType(runtime.promptPlan.answerType(), reply.getToolStatus());
         String finalToolStatus = normalizeToolStatus(reply.getToolStatus());
-        String finalNextAction = resolveNextAction(promptPlan.nextAction(), finalAnswerType);
-        AiDisplayCard finalCard = resolveCard(promptPlan.card(), finalAnswerType);
+        String finalNextAction = resolveNextAction(runtime.promptPlan.nextAction(), finalAnswerType);
+        AiDisplayCard finalCard = resolveCard(runtime.promptPlan.card(), finalAnswerType);
 
         conversationMemoryService.appendTurn(
                 currentUserId,
                 resolvedSessionId,
-                sceneResolution.sceneType(),
+                runtime.sceneResolution.sceneType(),
                 message,
                 reply.getContent(),
                 userCreatedAt,
@@ -114,14 +93,52 @@ public class AiChatServiceImpl implements AiChatService {
         return new AiChatResponse(
                 resolvedSessionId,
                 reply.getContent(),
-                sceneResolution.sceneType().name().toLowerCase(),
-                promptPlan.grounded(),
+                runtime.sceneResolution.sceneType().name().toLowerCase(),
+                runtime.promptPlan.grounded(),
                 finalNextAction,
                 finalAnswerType.name().toLowerCase(),
                 finalToolStatus,
                 finalCard,
-                buildConversationMeta(promptContext, sceneResolution.reused())
+                buildConversationMeta(runtime.promptContext, runtime.sceneResolution.reused())
         );
+    }
+
+    @Override
+    public Flux<AiChatStreamChunk> streamChat(String message, String sessionId, Long currentUserId, boolean canViewAnyOrder) {
+        String resolvedSessionId = conversationMemoryService.ensureSessionId(sessionId);
+        long userCreatedAt = System.currentTimeMillis();
+
+        SceneRuntime runtime = prepareRuntime(message, resolvedSessionId, currentUserId, canViewAnyOrder);
+        String streamPrompt = runtime.promptPlan.prompt() + """
+
+                
+                本次是流式输出。
+                直接连续输出最终给用户看的中文回答正文，不要输出 JSON，不要输出字段名，不要解释输出格式。
+                """;
+
+        var requestSpec = buildBaseRequest(runtime, streamPrompt)
+                .advisors(spec -> spec.advisors(conversationMemoryAdvisor).params(buildMemoryAdvisorParams(runtime.promptContext)));
+
+        StringBuilder assistantContent = new StringBuilder();
+        String scene = runtime.sceneResolution.sceneType().name().toLowerCase();
+
+        Flux<AiChatStreamChunk> prefix = Flux.just(new AiChatStreamChunk(resolvedSessionId, scene, "", false));
+        Flux<AiChatStreamChunk> contentFlux = requestSpec.stream()
+                .content()
+                .doOnNext(assistantContent::append)
+                .map(delta -> new AiChatStreamChunk(resolvedSessionId, scene, delta, false))
+                .doOnComplete(() -> conversationMemoryService.appendTurn(
+                        currentUserId,
+                        resolvedSessionId,
+                        runtime.sceneResolution.sceneType(),
+                        message,
+                        assistantContent.toString(),
+                        userCreatedAt,
+                        System.currentTimeMillis()
+                ));
+        Flux<AiChatStreamChunk> suffix = Flux.just(new AiChatStreamChunk(resolvedSessionId, scene, "", true));
+
+        return Flux.concat(prefix, contentFlux, suffix);
     }
 
     @Override
@@ -145,6 +162,45 @@ public class AiChatServiceImpl implements AiChatService {
     @Override
     public void renameSession(String sessionId, String title, Long currentUserId) {
         conversationMemoryService.renameSession(currentUserId, sessionId, title);
+    }
+
+    private SceneRuntime prepareRuntime(String message,
+                                        String sessionId,
+                                        Long currentUserId,
+                                        boolean canViewAnyOrder) {
+        SceneResolution sceneResolution = resolveSceneType(message, currentUserId, sessionId);
+        AiConversationMemoryService.ConversationPromptContext promptContext =
+                conversationMemoryService.getPromptContext(currentUserId, sessionId);
+
+        AiSceneRequestContext context = new AiSceneRequestContext(
+                message,
+                sessionId,
+                currentUserId,
+                canViewAnyOrder
+        );
+        AiPromptPlan promptPlan = buildPromptByScene(sceneResolution.sceneType(), context);
+        return new SceneRuntime(message, sceneResolution, promptContext, promptPlan);
+    }
+
+    private ChatClient.ChatClientRequestSpec buildStructuredRequest(SceneRuntime runtime) {
+        return buildBaseRequest(runtime, runtime.promptPlan.prompt())
+                .advisors(spec -> spec
+                        .advisors(conversationMemoryAdvisor, structuredOutputAdvisor)
+                        .params(buildAdvisorParams(runtime.promptPlan, runtime.promptContext)));
+    }
+
+    private ChatClient.ChatClientRequestSpec buildBaseRequest(SceneRuntime runtime, String systemPrompt) {
+        var requestSpec = chatClient.prompt()
+                .system(systemPrompt)
+                .user(runtime.message());
+
+        if (runtime.promptPlan.hasTools()) {
+            requestSpec = requestSpec.tools(runtime.promptPlan.tools());
+            if (!runtime.promptPlan.toolContext().isEmpty()) {
+                requestSpec = requestSpec.toolContext(runtime.promptPlan.toolContext());
+            }
+        }
+        return requestSpec;
     }
 
     private AiPromptPlan buildPromptByScene(AiSceneType sceneType, AiSceneRequestContext context) {
@@ -187,7 +243,13 @@ public class AiChatServiceImpl implements AiChatService {
 
     private Map<String, Object> buildAdvisorParams(AiPromptPlan promptPlan,
                                                    AiConversationMemoryService.ConversationPromptContext promptContext) {
-        Map<String, Object> params = new HashMap<>(promptPlan.advisorParams());
+        Map<String, Object> params = buildMemoryAdvisorParams(promptContext);
+        params.putAll(promptPlan.advisorParams());
+        return params;
+    }
+
+    private Map<String, Object> buildMemoryAdvisorParams(AiConversationMemoryService.ConversationPromptContext promptContext) {
+        Map<String, Object> params = new HashMap<>();
         if (StringUtils.hasText(promptContext.summary())) {
             params.put(AiAdvisorContextKeys.MEMORY_SUMMARY, promptContext.summary());
         }
@@ -263,5 +325,13 @@ public class AiChatServiceImpl implements AiChatService {
     }
 
     private record SceneResolution(AiSceneType sceneType, boolean reused) {
+    }
+
+    private record SceneRuntime(
+            String message,
+            SceneResolution sceneResolution,
+            AiConversationMemoryService.ConversationPromptContext promptContext,
+            AiPromptPlan promptPlan
+    ) {
     }
 }
