@@ -55,7 +55,7 @@ spring:
 因为现在配置了：
 
 - `baseline-on-migrate: true`
-- `baseline-version: 0`
+- `baseline-version: 1`
 
 这意味着：
 
@@ -160,6 +160,12 @@ spring:
 ```text
 http://localhost:5603/actuator/flyway
 ```
+
+注意：
+
+- 这个接口当前受 Spring Security 保护
+- 直接浏览器打开通常会返回 `401`
+- 需要你先登录并带上 token 再访问
 
 如果你在生产环境改了端口，就换成对应端口。
 
