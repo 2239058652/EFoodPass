@@ -243,8 +243,22 @@ CREATE TABLE IF NOT EXISTS food_stock_log
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='库存变动日志表';
 
-ALTER TABLE sys_user
-    ADD COLUMN IF NOT EXISTS token_version INT NOT NULL DEFAULT 0 COMMENT '令牌版本号';
+SET @ddl = (
+    SELECT IF(
+                   EXISTS(
+                           SELECT 1
+                           FROM information_schema.columns
+                           WHERE table_schema = DATABASE()
+                             AND table_name = 'sys_user'
+                             AND column_name = 'token_version'
+                   ),
+                   'SELECT 1',
+                   'ALTER TABLE sys_user ADD COLUMN token_version INT NOT NULL DEFAULT 0 COMMENT ''令牌版本号'''
+           )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 # 初始化admin账号
 INSERT INTO sys_user (username, password_hash, nickname, phone, status, token_version)
@@ -398,12 +412,90 @@ WHERE r.role_code = 'ADMIN'
                   WHERE rp.role_id = r.id
                     AND rp.permission_id = p.id);
 
-ALTER TABLE food_order
-    ADD COLUMN IF NOT EXISTS payment_status TINYINT NOT NULL DEFAULT 10 COMMENT '支付状态：10待支付 20已支付 30已退款',
-    ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) DEFAULT NULL COMMENT '支付方式',
-    ADD COLUMN IF NOT EXISTS paid_at DATETIME DEFAULT NULL COMMENT '支付时间',
-    ADD COLUMN IF NOT EXISTS close_reason VARCHAR(100) DEFAULT NULL COMMENT '关闭原因',
-    ADD COLUMN IF NOT EXISTS closed_at DATETIME DEFAULT NULL COMMENT '关闭时间';
+SET @ddl = (
+    SELECT IF(
+                   EXISTS(
+                           SELECT 1
+                           FROM information_schema.columns
+                           WHERE table_schema = DATABASE()
+                             AND table_name = 'food_order'
+                             AND column_name = 'payment_status'
+                   ),
+                   'SELECT 1',
+                   'ALTER TABLE food_order ADD COLUMN payment_status TINYINT NOT NULL DEFAULT 10 COMMENT ''支付状态：10待支付 20已支付 30已退款'''
+           )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = (
+    SELECT IF(
+                   EXISTS(
+                           SELECT 1
+                           FROM information_schema.columns
+                           WHERE table_schema = DATABASE()
+                             AND table_name = 'food_order'
+                             AND column_name = 'payment_method'
+                   ),
+                   'SELECT 1',
+                   'ALTER TABLE food_order ADD COLUMN payment_method VARCHAR(20) DEFAULT NULL COMMENT ''支付方式'''
+           )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = (
+    SELECT IF(
+                   EXISTS(
+                           SELECT 1
+                           FROM information_schema.columns
+                           WHERE table_schema = DATABASE()
+                             AND table_name = 'food_order'
+                             AND column_name = 'paid_at'
+                   ),
+                   'SELECT 1',
+                   'ALTER TABLE food_order ADD COLUMN paid_at DATETIME DEFAULT NULL COMMENT ''支付时间'''
+           )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = (
+    SELECT IF(
+                   EXISTS(
+                           SELECT 1
+                           FROM information_schema.columns
+                           WHERE table_schema = DATABASE()
+                             AND table_name = 'food_order'
+                             AND column_name = 'close_reason'
+                   ),
+                   'SELECT 1',
+                   'ALTER TABLE food_order ADD COLUMN close_reason VARCHAR(100) DEFAULT NULL COMMENT ''关闭原因'''
+           )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
+
+SET @ddl = (
+    SELECT IF(
+                   EXISTS(
+                           SELECT 1
+                           FROM information_schema.columns
+                           WHERE table_schema = DATABASE()
+                             AND table_name = 'food_order'
+                             AND column_name = 'closed_at'
+                   ),
+                   'SELECT 1',
+                   'ALTER TABLE food_order ADD COLUMN closed_at DATETIME DEFAULT NULL COMMENT ''关闭时间'''
+           )
+);
+PREPARE stmt FROM @ddl;
+EXECUTE stmt;
+DEALLOCATE PREPARE stmt;
 
 -- food_category 模块父权限
 INSERT INTO sys_permission (parent_id, perm_code, perm_name, perm_type, path, method, sort_no, status)

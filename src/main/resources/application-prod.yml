@@ -4,6 +4,11 @@ server:
 spring:
   application:
     name: EFoodPass
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 1
+    locations: classpath:db/migration
 
   # 数据源配置
   datasource:
@@ -63,3 +68,9 @@ order:
     fixed-delay-ms: 60000
     timeout-minutes: 15
     batch-size: 100
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics,flyway

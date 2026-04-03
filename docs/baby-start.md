@@ -48,18 +48,40 @@ CREATE DATABASE e_food DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 
 如果你已经有这个库了，这一步可以跳过。
 
-## 4. 第二步：导入初始化 SQL
+## 4. 第二步：理解现在的建库方式
 
-这个项目最重要的初始化脚本是：
+这个项目现在已经接入 Flyway。
+
+这意味着：
+
+- 你只要先创建一个空数据库 `e_food`
+- 再启动项目
+- 项目会自动建表并插入初始化数据
+
+也就是说，新手现在最推荐的方式已经不是先手工导 SQL 了，而是：
+
+1. 建空库
+2. 改配置
+3. 启动项目
+4. 让 Flyway 自动迁移
+
+### 手工 SQL 还在不在
+
+还在。
+
+最重要的手工脚本是：
 
 - [sql/init-rbac.sql](/C:/Users/22390/Desktop/EFoodPass/sql/init-rbac.sql)
 
-它做了两件大事：
+它主要用于：
 
-- 帮你建表
-- 帮你插入初始管理员、角色、权限等基础数据
+- 手工全量初始化参考
+- 排查数据库结构时对照
+- 你想自己手工执行时的兜底方案
 
-### 导入方法 A：用数据库工具导入
+### 如果你坚持手工导入
+
+你当然也可以手工执行 `init-rbac.sql`。
 
 如果你用的是 Navicat、DataGrip、DBeaver，最简单：
 
@@ -68,13 +90,28 @@ CREATE DATABASE e_food DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_general_ci;
 3. 打开 `sql/init-rbac.sql`
 4. 点击执行
 
-### 导入方法 B：用命令行导入
+### 命令行导入写法
 
 ```powershell
 mysql -u root -p e_food < sql/init-rbac.sql
 ```
 
 执行后输入你的 MySQL 密码即可。
+
+### 如果你不是新建库，而是老库升级
+
+现在更推荐你先直接重启项目，让 Flyway 自动迁移。
+
+如果你暂时不想依赖自动迁移，或者想手工兜底，也可以执行这个升级脚本：
+
+- [sql/upgrade-existing-db.sql](/C:/Users/22390/Desktop/EFoodPass/sql/upgrade-existing-db.sql)
+
+这个脚本会补齐当前版本需要的关键新增内容，比如：
+
+- `food_order` 的支付字段
+- 登录日志表
+- 操作日志表
+- 用户会话表
 
 ## 5. 第三步：改配置文件
 
@@ -139,6 +176,8 @@ mvnw.cmd spring-boot:run
 ```
 
 第一次启动会比较慢，这是正常的。
+
+第一次启动时，Flyway 也会自动跑数据库迁移。
 
 只要最后看到类似下面这种信息，通常就说明启动成功了：
 
@@ -270,6 +309,30 @@ POST /auth/login
 
 比如普通用户和管理员看到的接口就不一样。
 
+### 报错 7：启动时报 Flyway 验证失败
+
+如果你看到类似这种报错：
+
+```text
+Detected failed migration to version 1
+```
+
+通常说明：
+
+- 你之前已经让 Flyway 跑过一次
+- 但那次迁移中途失败了
+- 数据库里留下了失败的迁移历史
+
+最简单处理方法：
+
+```sql
+DROP TABLE IF EXISTS flyway_schema_history;
+```
+
+然后重新启动项目。
+
+这张表只记录迁移历史，不存业务数据。
+
 ## 13. 如果你已经启动成功，下一步看哪里
 
 下一份教程在这里：
@@ -282,3 +345,7 @@ POST /auth/login
 
 - [docs/baby-api-auth-and-user.md](/C:/Users/22390/Desktop/EFoodPass/docs/baby-api-auth-and-user.md)
 - [docs/baby-api-food-order.md](/C:/Users/22390/Desktop/EFoodPass/docs/baby-api-food-order.md)
+
+如果你后面开始维护数据库结构，再看这份：
+
+- [docs/db-migration.md](/C:/Users/22390/Desktop/EFoodPass/docs/db-migration.md)

@@ -10,6 +10,7 @@
 - 用户端菜单、购物车、下单、支付、取消订单
 - 后台订单处理、退款、导出、统计
 - 登录日志、操作日志
+- Flyway 自动数据库迁移
 
 如果你是第一次接触这个项目，不要先去看代码。先把项目跑起来，再照着 Swagger 点一遍，你会轻松很多。
 
@@ -17,10 +18,15 @@
 
 1. 安装好 `Java 17`、`MySQL 8`、`Redis`
 2. 在 MySQL 里新建数据库：`e_food`
-3. 执行项目里的初始化脚本：`sql/init-rbac.sql`
-4. 打开 [src/main/resources/application-dev.yml](/C:/Users/22390/Desktop/EFoodPass/src/main/resources/application-dev.yml)，把数据库、Redis、AI 配置改成你自己的
+3. 打开 [src/main/resources/application-dev.yml](/C:/Users/22390/Desktop/EFoodPass/src/main/resources/application-dev.yml)，把数据库、Redis、AI 配置改成你自己的
+4. 只需要保证数据库 `e_food` 已经创建好
 5. 在项目根目录运行：`mvnw.cmd spring-boot:run`
-6. 浏览器打开：`http://localhost:5603/swagger-ui.html`
+6. 首次启动会自动执行 Flyway 迁移
+7. 浏览器打开：`http://localhost:5603/swagger-ui.html`
+
+如果你的数据库是以前旧版本留下来的，不想重建库，可以执行：
+
+- [sql/upgrade-existing-db.sql](/C:/Users/22390/Desktop/EFoodPass/sql/upgrade-existing-db.sql)
 
 默认开发环境：
 
@@ -36,6 +42,7 @@
 - 零基础操作教程：[docs/baby-operations.md](/C:/Users/22390/Desktop/EFoodPass/docs/baby-operations.md)
 - 认证与会话接口样例教程：[docs/baby-api-auth-and-user.md](/C:/Users/22390/Desktop/EFoodPass/docs/baby-api-auth-and-user.md)
 - 点餐与订单接口样例教程：[docs/baby-api-food-order.md](/C:/Users/22390/Desktop/EFoodPass/docs/baby-api-food-order.md)
+- 数据库迁移说明：[docs/db-migration.md](/C:/Users/22390/Desktop/EFoodPass/docs/db-migration.md)
 
 ## 项目目录怎么认
 
@@ -55,9 +62,9 @@
 
 ## 推荐启动顺序
 
-1. 先导入数据库脚本
+1. 先创建空数据库
 2. 再改配置文件
-3. 再启动后端
+3. 再启动后端，让 Flyway 自动迁移
 4. 最后打开 Swagger 测接口
 
 ## 现在最适合怎么学
