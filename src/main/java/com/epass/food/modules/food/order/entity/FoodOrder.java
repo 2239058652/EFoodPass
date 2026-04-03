@@ -26,6 +26,16 @@ public class FoodOrder {
      */
     private Integer orderStatus;
 
+    private Integer paymentStatus;
+
+    private String paymentMethod;
+
+    private LocalDateTime paidAt;
+
+    private String closeReason;
+
+    private LocalDateTime closedAt;
+
     private String remark;
 
     private LocalDateTime createdAt;

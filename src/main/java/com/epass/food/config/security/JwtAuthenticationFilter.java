@@ -1,5 +1,7 @@
 package com.epass.food.config.security;
 
+import com.epass.food.modules.auth.session.entity.SysUserSession;
+import com.epass.food.modules.auth.session.service.SysUserSessionService;
 import com.epass.food.modules.system.permission.service.SysPermissionService;
 import com.epass.food.modules.system.role.entity.SysRole;
 import com.epass.food.modules.system.role.service.SysRoleService;
@@ -19,13 +21,11 @@ import org.springframework.util.StringUtils;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 
-/**
- * JWT 认证过滤器 （每次请求先经过过滤器链，这个jwt过滤器是其中一环）
- *
- */
 @Component
 public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
@@ -33,25 +33,24 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     private final SysUserService sysUserService;
     private final SysRoleService sysRoleService;
     private final SysPermissionService sysPermissionService;
+    private final SysUserSessionService sysUserSessionService;
 
     public JwtAuthenticationFilter(JwtTokenProvider jwtTokenProvider,
                                    SysUserService sysUserService,
                                    SysRoleService sysRoleService,
-                                   SysPermissionService sysPermissionService) {
+                                   SysPermissionService sysPermissionService,
+                                   SysUserSessionService sysUserSessionService) {
         this.jwtTokenProvider = jwtTokenProvider;
         this.sysUserService = sysUserService;
         this.sysRoleService = sysRoleService;
         this.sysPermissionService = sysPermissionService;
+        this.sysUserSessionService = sysUserSessionService;
     }
 
-    /**
-     * 获取请求中的 JWT token，并解析，查找数据库，设置用户认证信息
-     */
     @Override
     protected void doFilterInternal(@NonNull HttpServletRequest request,
                                     @NonNull HttpServletResponse response,
                                     @NonNull FilterChain filterChain) throws ServletException, IOException {
-
         String token = resolveToken(request);
 
         if (StringUtils.hasText(token)) {
@@ -59,33 +58,30 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
                 Claims claims = jwtTokenProvider.parseToken(token);
                 Long userId = Long.valueOf(claims.getSubject());
                 Integer tokenVersion = claims.get("tokenVersion", Integer.class);
+                String sessionId = claims.get("sessionId", String.class);
 
-                // 1. 获取用户信息
                 SysUser user = sysUserService.getById(userId);
-                if (user != null && Integer.valueOf(1).equals(user.getStatus())
-                        && user.getTokenVersion().equals(tokenVersion)) {
-
-                    // 2. 获取用户角色列表
-                    List<SysRole> roleList = sysRoleService.getRolesByUserId(userId);
-
-                    // 遍历角色列表，将角色标签装入 authorities 列表
+                SysUserSession session = sysUserSessionService.getValidSession(userId, sessionId, tokenVersion);
+                if (user != null
+                        && Integer.valueOf(1).equals(user.getStatus())
+                        && Objects.equals(user.getTokenVersion(), tokenVersion)
+                        && session != null) {
                     List<SimpleGrantedAuthority> authorities = new ArrayList<>();
+                    List<SysRole> roleList = sysRoleService.getRolesByUserId(userId);
                     for (SysRole role : roleList) {
                         authorities.add(new SimpleGrantedAuthority("ROLE_" + role.getRoleCode()));
                     }
 
-                    // 3. 获取用户权限列表
                     List<String> permissionCodes = sysPermissionService.getPermissionCodesByUserId(userId);
                     for (String permissionCode : permissionCodes) {
                         authorities.add(new SimpleGrantedAuthority(permissionCode));
                     }
 
-                    LoginUser loginUser = new LoginUser(user.getId(), user.getUsername(), user.getNickname());
+                    sysUserSessionService.touchSession(sessionId, LocalDateTime.now());
 
+                    LoginUser loginUser = new LoginUser(user.getId(), user.getUsername(), user.getNickname());
                     UsernamePasswordAuthenticationToken authentication =
                             new UsernamePasswordAuthenticationToken(loginUser, null, authorities);
-
-                    // 设置用户认证信息 到 SecurityContextHolder 中
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
             } catch (Exception e) {
@@ -96,12 +92,6 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         filterChain.doFilter(request, response);
     }
 
-    /**
-     * 获取请求中的 JWT token
-     *
-     * @param request 请求对象
-     * @return JWT token
-     */
     private String resolveToken(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {

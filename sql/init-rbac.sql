@@ -150,6 +150,23 @@ CREATE TABLE IF NOT EXISTS food_order_item
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='订单明细表';
 
+CREATE TABLE IF NOT EXISTS food_cart_item
+(
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '购物车项ID',
+    user_id      BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+    food_item_id BIGINT UNSIGNED NOT NULL COMMENT '菜品ID',
+    quantity     INT             NOT NULL COMMENT '数量',
+    created_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at   DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_food_cart_item_user_id_food_item_id (user_id, food_item_id),
+    KEY idx_food_cart_item_user_id (user_id),
+    KEY idx_food_cart_item_food_item_id (food_item_id),
+    CONSTRAINT fk_food_cart_item_user_id FOREIGN KEY (user_id) REFERENCES sys_user (id),
+    CONSTRAINT fk_food_cart_item_food_item_id FOREIGN KEY (food_item_id) REFERENCES food_item (id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='购物车项表';
+
 CREATE TABLE IF NOT EXISTS sys_operation_log
 (
     id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '日志ID',
@@ -171,6 +188,41 @@ CREATE TABLE IF NOT EXISTS sys_operation_log
     KEY idx_sys_operation_log_operate_time (operate_time)
 ) ENGINE = InnoDB
   DEFAULT CHARSET = utf8mb4 COMMENT ='操作日志表';
+
+CREATE TABLE IF NOT EXISTS sys_login_log
+(
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '日志ID',
+    user_id    BIGINT UNSIGNED          DEFAULT NULL COMMENT '用户ID',
+    username   VARCHAR(50)              DEFAULT NULL COMMENT '登录账号',
+    request_ip VARCHAR(64)              DEFAULT NULL COMMENT '请求IP',
+    success    TINYINT         NOT NULL DEFAULT 1 COMMENT '1成功 0失败',
+    message    VARCHAR(200)             DEFAULT NULL COMMENT '结果说明',
+    login_time DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '登录时间',
+    PRIMARY KEY (id),
+    KEY idx_sys_login_log_user_id (user_id),
+    KEY idx_sys_login_log_username (username),
+    KEY idx_sys_login_log_login_time (login_time)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='登录日志表';
+
+CREATE TABLE IF NOT EXISTS sys_user_session
+(
+    id               BIGINT UNSIGNED NOT NULL AUTO_INCREMENT COMMENT '会话ID',
+    user_id          BIGINT UNSIGNED NOT NULL COMMENT '用户ID',
+    session_id       VARCHAR(64)     NOT NULL COMMENT '会话标识',
+    token_version    INT             NOT NULL DEFAULT 0 COMMENT '令牌版本号',
+    request_ip       VARCHAR(64)              DEFAULT NULL COMMENT '登录IP',
+    user_agent       VARCHAR(255)             DEFAULT NULL COMMENT '设备标识',
+    login_time       DATETIME        NOT NULL DEFAULT CURRENT_TIMESTAMP COMMENT '登录时间',
+    last_access_time DATETIME                 DEFAULT NULL COMMENT '最后访问时间',
+    expire_time      DATETIME        NOT NULL COMMENT '过期时间',
+    PRIMARY KEY (id),
+    UNIQUE KEY uk_sys_user_session_session_id (session_id),
+    KEY idx_sys_user_session_user_id (user_id),
+    KEY idx_sys_user_session_expire_time (expire_time),
+    CONSTRAINT fk_sys_user_session_user_id FOREIGN KEY (user_id) REFERENCES sys_user (id)
+) ENGINE = InnoDB
+  DEFAULT CHARSET = utf8mb4 COMMENT ='用户会话表';
 
 CREATE TABLE IF NOT EXISTS food_stock_log
 (
@@ -260,6 +312,50 @@ ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
                         sort_no   = VALUES(sort_no),
                         status    = VALUES(status);
 
+# 操作日志权限
+INSERT INTO sys_permission (parent_id, perm_code, perm_name, perm_type, path, method, sort_no, status)
+VALUES (0, 'system:operation-log', '操作日志管理', 1, '/system/operation-log', NULL, 40, 1)
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+# 登录日志权限
+INSERT INTO sys_permission (parent_id, perm_code, perm_name, perm_type, path, method, sort_no, status)
+VALUES (0, 'system:login-log', '登录日志管理', 1, '/system/login-log', NULL, 50, 1)
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id, perm_code, perm_name, perm_type, path, method, sort_no, status)
+SELECT p.id, 'system:login-log:list', '登录日志列表查询', 3, '/system/login-log/list', 'GET', 51, 1
+FROM sys_permission p
+WHERE p.perm_code = 'system:login-log'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id, perm_code, perm_name, perm_type, path, method, sort_no, status)
+SELECT p.id, 'system:operation-log:list', '操作日志列表查询', 3, '/system/operation-log/list', 'GET', 41, 1
+FROM sys_permission p
+WHERE p.perm_code = 'system:operation-log'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
 # 初始化admin用户角色关联
 INSERT INTO sys_user_role (user_id, role_id)
 SELECT u.id, r.id
@@ -290,13 +386,24 @@ FROM sys_role r
                                                   'system:permission:list',
                                                   'system:permission:add',
                                                   'system:permission:update',
-                                                  'system:permission:delete'
+                                                  'system:permission:delete',
+                                                  'system:operation-log',
+                                                  'system:operation-log:list',
+                                                  'system:login-log',
+                                                  'system:login-log:list'
     )
 WHERE r.role_code = 'ADMIN'
   AND NOT EXISTS (SELECT 1
                   FROM sys_role_permission rp
                   WHERE rp.role_id = r.id
                     AND rp.permission_id = p.id);
+
+ALTER TABLE food_order
+    ADD COLUMN IF NOT EXISTS payment_status TINYINT NOT NULL DEFAULT 10 COMMENT '支付状态：10待支付 20已支付 30已退款',
+    ADD COLUMN IF NOT EXISTS payment_method VARCHAR(20) DEFAULT NULL COMMENT '支付方式',
+    ADD COLUMN IF NOT EXISTS paid_at DATETIME DEFAULT NULL COMMENT '支付时间',
+    ADD COLUMN IF NOT EXISTS close_reason VARCHAR(100) DEFAULT NULL COMMENT '关闭原因',
+    ADD COLUMN IF NOT EXISTS closed_at DATETIME DEFAULT NULL COMMENT '关闭时间';
 
 -- food_category 模块父权限
 INSERT INTO sys_permission (parent_id, perm_code, perm_name, perm_type, path, method, sort_no, status)
@@ -597,6 +704,30 @@ ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
                         status    = VALUES(status);
 
 INSERT INTO sys_permission (parent_id, perm_code, perm_name, perm_type, path, method, sort_no, status)
+SELECT p.id, 'food:order:refund', '订单退款', 3, '/food/order/refund', 'PUT', 2208, 1
+FROM sys_permission p
+WHERE p.perm_code = 'food:order'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id, perm_code, perm_name, perm_type, path, method, sort_no, status)
+SELECT p.id, 'food:order:export', '订单导出', 3, '/food/order/export', 'GET', 2209, 1
+FROM sys_permission p
+WHERE p.perm_code = 'food:order'
+ON DUPLICATE KEY UPDATE perm_name = VALUES(perm_name),
+                        parent_id = VALUES(parent_id),
+                        perm_type = VALUES(perm_type),
+                        path      = VALUES(path),
+                        method    = VALUES(method),
+                        sort_no   = VALUES(sort_no),
+                        status    = VALUES(status);
+
+INSERT INTO sys_permission (parent_id, perm_code, perm_name, perm_type, path, method, sort_no, status)
 SELECT p.id, 'food:order:stat', '订单统计', 3, '/food/order/stat/**', 'GET', 2207, 1
 FROM sys_permission p
 WHERE p.perm_code = 'food:order'
@@ -619,6 +750,8 @@ FROM sys_role r
                                                   'food:order:process',
                                                   'food:order:cancel',
                                                   'food:order:complete',
+                                                  'food:order:refund',
+                                                  'food:order:export',
                                                   'food:order:stat'
     )
 WHERE r.role_code = 'ADMIN'

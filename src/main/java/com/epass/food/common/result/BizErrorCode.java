@@ -7,6 +7,7 @@ public final class BizErrorCode {
      */
     public static final int AUTH_USERNAME_OR_PASSWORD_INVALID = 4001;
     public static final int AUTH_USER_DISABLED = 4002;
+    public static final int USER_SESSION_NOT_FOUND = 4003;
     public static final int USER_NOT_FOUND = 4004;
     public static final int USER_ROLE_NOT_FOUND_OR_DISABLED = 4005;
     public static final int ROLE_CODE_EXISTS = 4006;
@@ -28,6 +29,8 @@ public final class BizErrorCode {
     public static final int CORE_PERMISSION_CANNOT_DELETE = 4018;
     public static final int PERMISSION_TYPE_INVALID = 4019;
     public static final int USERNAME_EXISTS = 4020;
+    public static final int USER_PHONE_EXISTS = 4021;
+    public static final int USER_OLD_PASSWORD_INVALID = 4022;
 
     /**
      * food_category: 4101 - 4199
@@ -69,11 +72,26 @@ public final class BizErrorCode {
     public static final int ORDER_ITEM_STOCK_NOT_ENOUGH = 4313;
     public static final int ORDER_RESTORE_ITEM_NOT_FOUND = 4314;
     public static final int ORDER_NO_PERMISSION = 4315;
+    public static final int ORDER_ALREADY_PAID = 4316;
+    public static final int ORDER_UNPAID_CANNOT_PROCESS = 4317;
+    public static final int ORDER_PAYMENT_METHOD_INVALID = 4318;
+    public static final int ORDER_CANNOT_PAY = 4319;
+    public static final int ORDER_ONLY_PAID_CAN_REFUND = 4320;
+    public static final int ORDER_ALREADY_REFUNDED = 4321;
 
     /**
      * food_stock_log: 4401 - 4499
      */
     public static final int STOCK_LOG_CHANGE_TYPE_INVALID = 4401;
+
+    /**
+     * food_cart: 4501 - 4599
+     */
+    public static final int CART_EMPTY = 4501;
+    public static final int CART_ITEM_NOT_FOUND = 4502;
+    public static final int CART_ITEM_UNAVAILABLE = 4503;
+    public static final int CART_ITEM_STOCK_NOT_ENOUGH = 4504;
+    public static final int CART_HAS_INVALID_ITEMS = 4505;
 
     private BizErrorCode() {
     }

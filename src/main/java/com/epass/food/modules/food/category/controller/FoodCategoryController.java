@@ -4,6 +4,7 @@ import com.epass.food.common.page.PageResult;
 import com.epass.food.common.result.Result;
 import com.epass.food.modules.food.category.dto.*;
 import com.epass.food.modules.food.category.service.FoodCategoryService;
+import com.epass.food.modules.system.operationlog.annotation.OperationLog;
 import jakarta.validation.Valid;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
@@ -52,6 +53,7 @@ public class FoodCategoryController {
      */
     @PreAuthorize("hasAuthority('food:category:add')")
     @PostMapping
+    @OperationLog(module = "FOOD_CATEGORY", action = "CREATE")
     public Result<Void> create(@Valid @RequestBody FoodCategoryCreateRequest request) {
         foodCategoryService.createCategory(request);
         return Result.success();
@@ -65,6 +67,7 @@ public class FoodCategoryController {
      */
     @PreAuthorize("hasAuthority('food:category:update')")
     @PutMapping
+    @OperationLog(module = "FOOD_CATEGORY", action = "UPDATE")
     public Result<Void> update(@Valid @RequestBody FoodCategoryUpdateRequest request) {
         foodCategoryService.updateCategory(request);
         return Result.success();
@@ -78,6 +81,7 @@ public class FoodCategoryController {
      */
     @PreAuthorize("hasAuthority('food:category:update-status')")
     @PutMapping("/status")
+    @OperationLog(module = "FOOD_CATEGORY", action = "UPDATE_STATUS")
     public Result<Void> updateStatus(@Valid @RequestBody FoodCategoryUpdateStatusRequest request) {
         foodCategoryService.updateCategoryStatus(request);
         return Result.success();
@@ -91,6 +95,7 @@ public class FoodCategoryController {
      */
     @PreAuthorize("hasAuthority('food:category:delete')")
     @DeleteMapping("/{id}")
+    @OperationLog(module = "FOOD_CATEGORY", action = "DELETE")
     public Result<Void> delete(@PathVariable Long id) {
         foodCategoryService.deleteCategory(id);
         return Result.success();

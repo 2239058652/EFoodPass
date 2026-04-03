@@ -2,6 +2,7 @@ package com.epass.food.modules.system.permission.controller;
 
 import com.epass.food.common.page.PageResult;
 import com.epass.food.common.result.Result;
+import com.epass.food.modules.system.operationlog.annotation.OperationLog;
 import com.epass.food.modules.system.permission.dto.*;
 import com.epass.food.modules.system.permission.service.SysPermissionService;
 import jakarta.validation.Valid;
@@ -39,6 +40,7 @@ public class SysPermissionController {
      */
     @PreAuthorize("hasAuthority('system:permission:add')")
     @PostMapping
+    @OperationLog(module = "SYSTEM_PERMISSION", action = "CREATE")
     public Result<Void> create(@Valid @RequestBody PermissionCreateRequest request) {
         sysPermissionService.createPermission(request);
         return Result.success();
@@ -51,6 +53,7 @@ public class SysPermissionController {
      */
     @PreAuthorize("hasAuthority('system:permission:update')")
     @PutMapping("/status")
+    @OperationLog(module = "SYSTEM_PERMISSION", action = "UPDATE_STATUS")
     public Result<Void> updateStatus(@Valid @RequestBody PermissionUpdateStatusRequest request) {
         sysPermissionService.updatePermissionStatus(request);
         return Result.success();
@@ -63,6 +66,7 @@ public class SysPermissionController {
      */
     @PreAuthorize("hasAuthority('system:permission:delete')")
     @DeleteMapping("/{id}")
+    @OperationLog(module = "SYSTEM_PERMISSION", action = "DELETE")
     public Result<Void> delete(@PathVariable Long id) {
         sysPermissionService.deletePermission(id);
         return Result.success();
@@ -75,6 +79,7 @@ public class SysPermissionController {
      */
     @PreAuthorize("hasAuthority('system:permission:update')")
     @PutMapping
+    @OperationLog(module = "SYSTEM_PERMISSION", action = "UPDATE")
     public Result<Void> update(@Valid @RequestBody PermissionUpdateRequest request) {
         sysPermissionService.updatePermission(request);
         return Result.success();

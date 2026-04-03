@@ -6,9 +6,11 @@ import lombok.Data;
 public class OrderStatusCountResponse {
 
     /**
-     * 10待确认 20制作中 30已完成 40已取消
+     * 10寰呯‘璁?20鍒朵綔涓?30宸插畬鎴?40宸插彇娑?
      */
     private Integer orderStatus;
+
+    private String orderStatusLabel;
 
     private Long orderCount;
 }

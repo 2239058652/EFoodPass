@@ -2,6 +2,7 @@ package com.epass.food.modules.system.user.controller;
 
 import com.epass.food.common.page.PageResult;
 import com.epass.food.common.result.Result;
+import com.epass.food.modules.system.operationlog.annotation.OperationLog;
 import com.epass.food.modules.system.user.dto.*;
 import com.epass.food.modules.system.user.service.SysUserService;
 import jakarta.validation.Valid;
@@ -39,6 +40,7 @@ public class SysUserController {
      */
     @PreAuthorize("hasAuthority('system:user:add')")
     @PostMapping
+    @OperationLog(module = "SYSTEM_USER", action = "CREATE")
     public Result<Void> create(@Valid @RequestBody UserCreateRequest request) {
         sysUserService.createUser(request);
         return Result.success();
@@ -52,6 +54,7 @@ public class SysUserController {
      */
     @PreAuthorize("hasAuthority('system:user:assign-role')")
     @PostMapping("/assign-role")
+    @OperationLog(module = "SYSTEM_USER", action = "ASSIGN_ROLE")
     public Result<Void> assignRole(@Valid @RequestBody UserAssignRoleRequest request) {
         sysUserService.assignRoles(request);
         return Result.success();
@@ -65,6 +68,7 @@ public class SysUserController {
      */
     @PreAuthorize("hasAuthority('system:user:update')")
     @PutMapping("/status")
+    @OperationLog(module = "SYSTEM_USER", action = "UPDATE_STATUS")
     public Result<Void> updateStatus(@Valid @RequestBody UserUpdateStatusRequest request) {
         sysUserService.updateUserStatus(request);
         return Result.success();
@@ -77,6 +81,7 @@ public class SysUserController {
      */
     @PreAuthorize("hasAuthority('system:user:delete')")
     @DeleteMapping("/{id}")
+    @OperationLog(module = "SYSTEM_USER", action = "DELETE")
     public Result<Void> delete(@PathVariable Long id) {
         sysUserService.deleteUser(id);
         return Result.success();
@@ -89,6 +94,7 @@ public class SysUserController {
      */
     @PreAuthorize("hasAuthority('system:user:update')")
     @PutMapping
+    @OperationLog(module = "SYSTEM_USER", action = "UPDATE")
     public Result<Void> update(@Valid @RequestBody UserUpdateRequest request) {
         sysUserService.updateUser(request);
         return Result.success();
@@ -101,6 +107,7 @@ public class SysUserController {
      */
     @PreAuthorize("hasAuthority('system:user:update')")
     @PutMapping("/reset-password")
+    @OperationLog(module = "SYSTEM_USER", action = "RESET_PASSWORD")
     public Result<Void> resetPassword(@Valid @RequestBody UserResetPasswordRequest request) {
         sysUserService.resetPassword(request);
         return Result.success();

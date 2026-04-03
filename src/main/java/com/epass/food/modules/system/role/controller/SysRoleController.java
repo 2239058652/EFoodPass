@@ -2,6 +2,7 @@ package com.epass.food.modules.system.role.controller;
 
 import com.epass.food.common.page.PageResult;
 import com.epass.food.common.result.Result;
+import com.epass.food.modules.system.operationlog.annotation.OperationLog;
 import com.epass.food.modules.system.role.dto.*;
 import com.epass.food.modules.system.role.service.SysRoleService;
 import jakarta.validation.Valid;
@@ -39,6 +40,7 @@ public class SysRoleController {
      */
     @PreAuthorize("hasAuthority('system:role:add')")
     @PostMapping
+    @OperationLog(module = "SYSTEM_ROLE", action = "CREATE")
     public Result<Void> create(@Valid @RequestBody RoleCreateRequest request) {
         sysRoleService.createRole(request);
         return Result.success();
@@ -52,6 +54,7 @@ public class SysRoleController {
      */
     @PreAuthorize("hasAuthority('system:role:assign-permission')")
     @PostMapping("/assign-permission")
+    @OperationLog(module = "SYSTEM_ROLE", action = "ASSIGN_PERMISSION")
     public Result<Void> assignPermission(@Valid @RequestBody RoleAssignPermissionRequest request) {
         sysRoleService.assignPermissions(request);
         return Result.success();
@@ -65,6 +68,7 @@ public class SysRoleController {
      */
     @PreAuthorize("hasAuthority('system:role:update')")
     @PutMapping("/status")
+    @OperationLog(module = "SYSTEM_ROLE", action = "UPDATE_STATUS")
     public Result<Void> updateStatus(@Valid @RequestBody RoleUpdateStatusRequest request) {
         sysRoleService.updateRoleStatus(request);
         return Result.success();
@@ -78,6 +82,7 @@ public class SysRoleController {
      */
     @PreAuthorize("hasAuthority('system:role:delete')")
     @DeleteMapping("/{id}")
+    @OperationLog(module = "SYSTEM_ROLE", action = "DELETE")
     public Result<Void> delete(@PathVariable Long id) {
         sysRoleService.deleteRole(id);
         return Result.success();
@@ -103,6 +108,7 @@ public class SysRoleController {
      */
     @PreAuthorize("hasAuthority('system:role:update')")
     @PutMapping
+    @OperationLog(module = "SYSTEM_ROLE", action = "UPDATE")
     public Result<Void> update(@Valid @RequestBody RoleUpdateRequest request) {
         sysRoleService.updateRole(request);
         return Result.success();

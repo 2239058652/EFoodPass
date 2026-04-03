@@ -21,6 +21,22 @@ public class FoodOrderListResponse {
      */
     private Integer orderStatus;
 
+    private String orderStatusLabel;
+
+    private Integer paymentStatus;
+
+    private String paymentStatusLabel;
+
+    private String paymentMethod;
+
+    private LocalDateTime paidAt;
+
+    private String closeReason;
+
+    private String closeReasonLabel;
+
+    private LocalDateTime closedAt;
+
     private String remark;
 
     private LocalDateTime createdAt;

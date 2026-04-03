@@ -15,6 +15,8 @@ public interface SysUserService extends IService<SysUser> {
      */
     SysUser getByUsername(String username);
 
+    SysUser getByPhone(String phone);
+
     /**
      * 查询用户列表
      *

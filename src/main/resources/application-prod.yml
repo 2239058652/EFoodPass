@@ -56,3 +56,10 @@ springdoc:
     enabled: false
   swagger-ui:
     enabled: false
+
+order:
+  auto-close:
+    enabled: true
+    fixed-delay-ms: 60000
+    timeout-minutes: 15
+    batch-size: 100

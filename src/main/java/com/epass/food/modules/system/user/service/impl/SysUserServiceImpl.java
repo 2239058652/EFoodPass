@@ -66,16 +66,44 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
     private void validateUserStatus(Integer status) {
         if (!Integer.valueOf(0).equals(status) && !Integer.valueOf(1).equals(status)) {
-            throw new BusinessException(BizErrorCode.USER_STATUS_INVALID, "用户状态值不合法");
+            throw new BusinessException(BizErrorCode.USER_STATUS_INVALID, "user status is invalid");
+        }
+    }
+
+    private String normalizePhone(String phone) {
+        if (!StringUtils.hasText(phone)) {
+            return null;
+        }
+        return phone.trim();
+    }
+
+    private void validatePhoneUnique(String phone, Long excludeUserId) {
+        String normalizedPhone = normalizePhone(phone);
+        if (!StringUtils.hasText(normalizedPhone)) {
+            return;
+        }
+
+        SysUser existUser = getByPhone(normalizedPhone);
+        if (existUser != null && !existUser.getId().equals(excludeUserId)) {
+            throw new BusinessException(BizErrorCode.USER_PHONE_EXISTS, "phone already exists");
         }
     }
 
     @Override
     public SysUser getByUsername(String username) {
-        LambdaQueryWrapper<SysUser> queryWrapper = new LambdaQueryWrapper<>();
-        queryWrapper.eq(SysUser::getUsername, username);
-        queryWrapper.last("limit 1");
-        return this.getOne(queryWrapper);
+        return this.getOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getUsername, username)
+                .last("limit 1"));
+    }
+
+    @Override
+    public SysUser getByPhone(String phone) {
+        if (!StringUtils.hasText(phone)) {
+            return null;
+        }
+        return this.getOne(new LambdaQueryWrapper<SysUser>()
+                .eq(SysUser::getPhone, phone.trim())
+                .last("limit 1"));
     }
 
     @Override
@@ -98,10 +126,9 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
 
         Page<SysUser> page = new Page<>(query.getPageNum(), query.getPageSize());
         Page<SysUser> userPage = this.page(page, queryWrapper);
-        List<SysUser> userList = userPage.getRecords();
 
         List<UserListResponse> responseList = new ArrayList<>();
-        for (SysUser user : userList) {
+        for (SysUser user : userPage.getRecords()) {
             List<SysRole> roleList = sysRoleService.getRolesByUserId(user.getId());
             responseList.add(getUserListResponse(user, roleList));
         }
@@ -118,16 +145,17 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public void createUser(UserCreateRequest request) {
         SysUser existUser = this.getByUsername(request.getUsername());
         if (existUser != null) {
-            throw new BusinessException(BizErrorCode.USERNAME_EXISTS, "用户名已存在");
+            throw new BusinessException(BizErrorCode.USERNAME_EXISTS, "username already exists");
         }
 
         validateUserStatus(request.getStatus());
+        validatePhoneUnique(request.getPhone(), null);
 
         SysUser user = new SysUser();
         user.setUsername(request.getUsername());
         user.setPasswordHash(passwordEncoder.encode(request.getPassword()));
         user.setNickname(request.getNickname());
-        user.setPhone(request.getPhone());
+        user.setPhone(normalizePhone(request.getPhone()));
         user.setStatus(request.getStatus());
         user.setTokenVersion(0);
 
@@ -138,7 +166,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public void assignRoles(UserAssignRoleRequest request) {
         SysUser user = this.getById(request.getUserId());
         if (user == null) {
-            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "user not found");
         }
 
         Long roleCount = sysRoleMapper.selectCount(
@@ -147,13 +175,11 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
                         .eq(SysRole::getStatus, 1)
         );
         if (roleCount == null || roleCount != request.getRoleIds().size()) {
-            throw new BusinessException(BizErrorCode.USER_ROLE_NOT_FOUND_OR_DISABLED, "角色不存在或已禁用");
+            throw new BusinessException(BizErrorCode.USER_ROLE_NOT_FOUND_OR_DISABLED, "role not found or disabled");
         }
 
-        sysUserRoleMapper.delete(
-                new LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getUserId, request.getUserId())
-        );
+        sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getUserId, request.getUserId()));
 
         for (Long roleId : request.getRoleIds()) {
             SysUserRole userRole = new SysUserRole();
@@ -167,13 +193,13 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public void updateUserStatus(UserUpdateStatusRequest request) {
         SysUser user = this.getById(request.getUserId());
         if (user == null) {
-            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "user not found");
         }
 
         validateUserStatus(request.getStatus());
 
         if ("admin".equals(user.getUsername()) && Integer.valueOf(0).equals(request.getStatus())) {
-            throw new BusinessException(BizErrorCode.ADMIN_USER_CANNOT_DISABLE, "系统管理员不能被禁用");
+            throw new BusinessException(BizErrorCode.ADMIN_USER_CANNOT_DISABLE, "admin user cannot be disabled");
         }
 
         user.setStatus(request.getStatus());
@@ -184,17 +210,15 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public void deleteUser(Long userId) {
         SysUser user = this.getById(userId);
         if (user == null) {
-            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "user not found");
         }
 
         if ("admin".equals(user.getUsername())) {
-            throw new BusinessException(BizErrorCode.ADMIN_USER_CANNOT_DELETE, "系统管理员不能被删除");
+            throw new BusinessException(BizErrorCode.ADMIN_USER_CANNOT_DELETE, "admin user cannot be deleted");
         }
 
-        sysUserRoleMapper.delete(
-                new LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getUserId, userId)
-        );
+        sysUserRoleMapper.delete(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getUserId, userId));
 
         this.removeById(userId);
     }
@@ -203,17 +227,18 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public void updateUser(UserUpdateRequest request) {
         SysUser user = this.getById(request.getId());
         if (user == null) {
-            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "user not found");
         }
 
         validateUserStatus(request.getStatus());
+        validatePhoneUnique(request.getPhone(), user.getId());
 
         if ("admin".equals(user.getUsername()) && Integer.valueOf(0).equals(request.getStatus())) {
-            throw new BusinessException(BizErrorCode.ADMIN_USER_CANNOT_DISABLE, "系统管理员不能被禁用");
+            throw new BusinessException(BizErrorCode.ADMIN_USER_CANNOT_DISABLE, "admin user cannot be disabled");
         }
 
         user.setNickname(request.getNickname());
-        user.setPhone(request.getPhone());
+        user.setPhone(normalizePhone(request.getPhone()));
         user.setStatus(request.getStatus());
         this.updateById(user);
     }
@@ -222,7 +247,7 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public void resetPassword(UserResetPasswordRequest request) {
         SysUser user = this.getById(request.getUserId());
         if (user == null) {
-            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "user not found");
         }
 
         user.setPasswordHash(passwordEncoder.encode(request.getNewPassword()));
@@ -235,13 +260,11 @@ public class SysUserServiceImpl extends ServiceImpl<SysUserMapper, SysUser> impl
     public UserDetailResponse getUserDetail(Long userId) {
         SysUser user = this.getById(userId);
         if (user == null) {
-            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "用户不存在");
+            throw new BusinessException(BizErrorCode.USER_NOT_FOUND, "user not found");
         }
 
-        List<SysUserRole> userRoleList = sysUserRoleMapper.selectList(
-                new LambdaQueryWrapper<SysUserRole>()
-                        .eq(SysUserRole::getUserId, userId)
-        );
+        List<SysUserRole> userRoleList = sysUserRoleMapper.selectList(new LambdaQueryWrapper<SysUserRole>()
+                .eq(SysUserRole::getUserId, userId));
 
         List<Long> roleIds = new ArrayList<>();
         for (SysUserRole userRole : userRoleList) {

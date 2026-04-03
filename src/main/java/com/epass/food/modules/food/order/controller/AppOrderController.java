@@ -4,13 +4,21 @@ import com.epass.food.common.page.PageResult;
 import com.epass.food.common.result.Result;
 import com.epass.food.config.security.LoginUser;
 import com.epass.food.modules.food.order.dto.AppOrderCreateRequest;
+import com.epass.food.modules.food.order.dto.AppOrderPayRequest;
+import com.epass.food.modules.food.order.dto.AppOrderPreviewResponse;
 import com.epass.food.modules.food.order.dto.FoodOrderDetailResponse;
 import com.epass.food.modules.food.order.dto.FoodOrderListQuery;
 import com.epass.food.modules.food.order.dto.FoodOrderListResponse;
 import com.epass.food.modules.food.order.service.FoodOrderService;
 import jakarta.validation.Valid;
 import org.springframework.security.core.Authentication;
-import org.springframework.web.bind.annotation.*;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
+import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
+import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @RequestMapping("/app/order")
@@ -41,6 +49,22 @@ public class AppOrderController {
                                Authentication authentication) {
         LoginUser loginUser = (LoginUser) authentication.getPrincipal();
         foodOrderService.createCurrentUserOrder(loginUser.getUserId(), request);
+        return Result.success();
+    }
+
+    @PostMapping("/preview")
+    public Result<AppOrderPreviewResponse> preview(@Valid @RequestBody AppOrderCreateRequest request,
+                                                   Authentication authentication) {
+        LoginUser loginUser = (LoginUser) authentication.getPrincipal();
+        return Result.success(foodOrderService.previewCurrentUserOrder(loginUser.getUserId(), request));
+    }
+
+    @PostMapping("/pay/{id}")
+    public Result<Void> pay(@PathVariable Long id,
+                            @Valid @RequestBody AppOrderPayRequest request,
+                            Authentication authentication) {
+        LoginUser loginUser = (LoginUser) authentication.getPrincipal();
+        foodOrderService.payCurrentUserOrder(loginUser.getUserId(), id, request);
         return Result.success();
     }
 
