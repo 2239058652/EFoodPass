@@ -45,6 +45,8 @@
 - Flyway 宝宝级教科书：[docs/flyway-baby.md](/C:/Users/22390/Desktop/EFoodPass/docs/flyway-baby.md)
 - Flyway 实战宝宝教程：[docs/flyway-practice-baby.md](/C:/Users/22390/Desktop/EFoodPass/docs/flyway-practice-baby.md)
 - 数据库迁移说明：[docs/db-migration.md](/C:/Users/22390/Desktop/EFoodPass/docs/db-migration.md)
+- 宝宝级验收清单：[docs/acceptance-baby.md](/C:/Users/22390/Desktop/EFoodPass/docs/acceptance-baby.md)
+- 宝宝级排错教程：[docs/troubleshooting-baby.md](/C:/Users/22390/Desktop/EFoodPass/docs/troubleshooting-baby.md)
 
 ## 项目目录怎么认
 

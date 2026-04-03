@@ -1,0 +1,171 @@
+@baseUrl = http://localhost:5603
+@adminToken = 粘贴登录后拿到的token
+@categoryId = 1
+@foodItemId = 1
+@orderId = 1001
+
+### 1. 管理员登录
+POST {{baseUrl}}/auth/login
+Content-Type: application/json
+
+{
+  "username": "admin",
+  "password": "Admin@123"
+}
+
+### 2. 查看当前用户
+GET {{baseUrl}}/auth/me
+Authorization: Bearer {{adminToken}}
+
+### 3. 查看 Flyway Actuator
+GET {{baseUrl}}/actuator/flyway
+Authorization: Bearer {{adminToken}}
+
+### 4. 创建验收分类
+POST {{baseUrl}}/food/category
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "name": "验收分类",
+  "sortNo": 1,
+  "status": 1
+}
+
+### 5. 查询分类列表
+GET {{baseUrl}}/food/category/list?pageNum=1&pageSize=10
+Authorization: Bearer {{adminToken}}
+
+### 6. 创建验收菜品
+POST {{baseUrl}}/food/item
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "categoryId": {{categoryId}},
+  "name": "验收炒饭",
+  "price": 18.00,
+  "stock": 20,
+  "isOnSale": 1,
+  "description": "用于接口验收"
+}
+
+### 7. 查询菜品列表
+GET {{baseUrl}}/food/item/list?pageNum=1&pageSize=10
+Authorization: Bearer {{adminToken}}
+
+### 8. 查看用户端菜单分类树
+GET {{baseUrl}}/app/menu/tree
+Authorization: Bearer {{adminToken}}
+
+### 9. 查看用户端菜品列表
+GET {{baseUrl}}/app/menu/items?pageNum=1&pageSize=10
+Authorization: Bearer {{adminToken}}
+
+### 10. 加入购物车
+POST {{baseUrl}}/app/cart/item
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "foodItemId": {{foodItemId}},
+  "quantity": 2
+}
+
+### 11. 查看购物车
+GET {{baseUrl}}/app/cart
+Authorization: Bearer {{adminToken}}
+
+### 12. 购物车结算
+POST {{baseUrl}}/app/cart/checkout
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "remark": "验收用订单"
+}
+
+### 13. 下单预览
+POST {{baseUrl}}/app/order/preview
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "remark": "验收用订单",
+  "items": [
+    {
+      "foodItemId": {{foodItemId}},
+      "quantity": 2
+    }
+  ]
+}
+
+### 14. 创建订单
+POST {{baseUrl}}/app/order
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "remark": "验收用订单",
+  "items": [
+    {
+      "foodItemId": {{foodItemId}},
+      "quantity": 2
+    }
+  ]
+}
+
+### 15. 查看我的订单列表
+GET {{baseUrl}}/app/order/list?pageNum=1&pageSize=10
+Authorization: Bearer {{adminToken}}
+
+### 16. 查看我的订单详情
+GET {{baseUrl}}/app/order/{{orderId}}
+Authorization: Bearer {{adminToken}}
+
+### 17. 支付订单
+POST {{baseUrl}}/app/order/pay/{{orderId}}
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "paymentMethod": "ALIPAY"
+}
+
+### 18. 后台订单列表
+GET {{baseUrl}}/food/order/list?pageNum=1&pageSize=10
+Authorization: Bearer {{adminToken}}
+
+### 19. 开始制作
+PUT {{baseUrl}}/food/order/process
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "orderId": {{orderId}}
+}
+
+### 20. 完成订单
+PUT {{baseUrl}}/food/order/complete
+Content-Type: application/json
+Authorization: Bearer {{adminToken}}
+
+{
+  "orderId": {{orderId}}
+}
+
+### 21. 订单统计总览
+GET {{baseUrl}}/food/order/stat/overview
+Authorization: Bearer {{adminToken}}
+
+### 22. 支付状态统计
+GET {{baseUrl}}/food/order/stat/payment-status-count
+Authorization: Bearer {{adminToken}}
+
+### 23. 登录日志
+GET {{baseUrl}}/system/login-log/list?pageNum=1&pageSize=10
+Authorization: Bearer {{adminToken}}
+
+### 24. 操作日志
+GET {{baseUrl}}/system/operation-log/list?pageNum=1&pageSize=10
+Authorization: Bearer {{adminToken}}
