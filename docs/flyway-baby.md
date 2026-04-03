@@ -9,6 +9,10 @@
 
 如果你是第一次听到 Flyway，这份就是给你看的。
 
+如果你已经懂概念，想直接照着当前项目实操，继续看：
+
+- [flyway-practice-baby.md](./flyway-practice-baby.md)
+
 ## 1. 先用最简单的话说：Flyway 是干什么的
 
 Flyway 是一个“数据库升级管家”。

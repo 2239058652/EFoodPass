@@ -43,6 +43,7 @@
 - 认证与会话接口样例教程：[docs/baby-api-auth-and-user.md](/C:/Users/22390/Desktop/EFoodPass/docs/baby-api-auth-and-user.md)
 - 点餐与订单接口样例教程：[docs/baby-api-food-order.md](/C:/Users/22390/Desktop/EFoodPass/docs/baby-api-food-order.md)
 - Flyway 宝宝级教科书：[docs/flyway-baby.md](/C:/Users/22390/Desktop/EFoodPass/docs/flyway-baby.md)
+- Flyway 实战宝宝教程：[docs/flyway-practice-baby.md](/C:/Users/22390/Desktop/EFoodPass/docs/flyway-practice-baby.md)
 - 数据库迁移说明：[docs/db-migration.md](/C:/Users/22390/Desktop/EFoodPass/docs/db-migration.md)
 
 ## 项目目录怎么认

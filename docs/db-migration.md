@@ -68,7 +68,7 @@ spring:
 而我们的 `V1` 是幂等脚本，里面大量使用了：
 
 - `CREATE TABLE IF NOT EXISTS`
-- `ADD COLUMN IF NOT EXISTS`
+- `information_schema` + `ALTER TABLE`
 - `ON DUPLICATE KEY UPDATE`
 - `NOT EXISTS`
 
