@@ -47,6 +47,7 @@
 - 数据库迁移说明：[docs/db-migration.md](/C:/Users/22390/Desktop/EFoodPass/docs/db-migration.md)
 - 宝宝级验收清单：[docs/acceptance-baby.md](/C:/Users/22390/Desktop/EFoodPass/docs/acceptance-baby.md)
 - 宝宝级排错教程：[docs/troubleshooting-baby.md](/C:/Users/22390/Desktop/EFoodPass/docs/troubleshooting-baby.md)
+- 宝宝级 FAQ：[docs/faq-baby.md](/C:/Users/22390/Desktop/EFoodPass/docs/faq-baby.md)
 
 ## 项目目录怎么认
 
@@ -54,6 +55,7 @@
 - [src/main/resources](/C:/Users/22390/Desktop/EFoodPass/src/main/resources)：配置文件
 - [sql](/C:/Users/22390/Desktop/EFoodPass/sql)：建表和初始化脚本
 - [scripts/auth.http](/C:/Users/22390/Desktop/EFoodPass/scripts/auth.http)：接口调试样例
+- [scripts/baby-login-and-flyway.ps1](/C:/Users/22390/Desktop/EFoodPass/scripts/baby-login-and-flyway.ps1)：Windows 快速登录和查看 Flyway
 - [docs](/C:/Users/22390/Desktop/EFoodPass/docs)：文档
 
 ## 启动前一定看

@@ -1,6 +1,6 @@
 @baseUrl = http://localhost:5603
-@adminToken = eyJhbGciOiJIUzUxMiJ9.eyJzdWIiOiIxIiwidXNlcm5hbWUiOiJhZG1pbiIsInRva2VuVmVyc2lvbiI6MSwiaWF0IjoxNzczMzIxNTUxLCJleHAiOjE3NzMzMjg3NTF9.DkQBdMzA6JDJOF8RKHYlB3h8t4yEuoXtHp95ztgBiwzbKBB3zRkHBuTSuzxA1cB5PzB5h6hz5xzL0m0TNfhoKQ
-@userToken =
+@adminToken = 把管理员登录后拿到的token贴到这里
+@userToken = 把普通用户登录后拿到的token贴到这里
 # 测试账号密码
 # 管理员： admin Admin@123
 # 普通用户： user1 User@123

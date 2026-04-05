@@ -428,5 +428,7 @@ GET /system/operation-log/list?pageNum=1&pageSize=10
 - [flyway-baby.md](./flyway-baby.md)
 - [flyway-practice-baby.md](./flyway-practice-baby.md)
 - [troubleshooting-baby.md](./troubleshooting-baby.md)
+- [faq-baby.md](./faq-baby.md)
 - [baby-acceptance.http](/C:/Users/22390/Desktop/EFoodPass/scripts/baby-acceptance.http)
+- [baby-login-and-flyway.ps1](/C:/Users/22390/Desktop/EFoodPass/scripts/baby-login-and-flyway.ps1)
 - [flyway-check.sql](/C:/Users/22390/Desktop/EFoodPass/scripts/flyway-check.sql)
